@@ -1,0 +1,28 @@
+{
+  "name": "saniga-zeiterfassung-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MVP API for Saniga AG Zeiterfassung",
+  "scripts": {
+    "postinstall": "prisma generate",
+    "start": "prisma migrate deploy && node src/index.js",
+    "dev": "prisma migrate deploy && node --watch src/index.js",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "prisma": "^6.3.0"
+  }
+}

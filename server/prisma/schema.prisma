@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role
+  firstName    String
+  lastName     String
+  jobTitle     String   @default("Mitarbeiter")
+  hourlyRate   Decimal  @default(35) @db.Decimal(10, 2)
+  weeklyHours  Int      @default(45)
+  avatarColor  String   @default("#12B8E1")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  entries      TimeEntry[]
+
+  @@index([role])
+}
+
+model TimeEntry {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date         String
+  fromMinutes  Int
+  toMinutes    Int
+  breakMinutes Int      @default(0)
+  note         String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, date])
+}

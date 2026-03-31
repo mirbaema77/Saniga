@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Saniga Zeiterfassung – Demo (offline)</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="demo.css"/>
+</head>
+<body>
+<div class="demo-banner">
+  <strong>Offline-Demo</strong> — Beispieldaten nur in diesem Browserfenster. Kein Server, kein Node.js. Zum Speichern in der Cloud später <code>python run.py</code> oder Railway nutzen.
+  <span class="demo-banner-role">Start: <strong>Urim Gashi (Admin)</strong> mit voller Navigation. Zum Test der Mitarbeiter-Ansicht einen anderen Namen im Dropdown wählen — dann erscheinen nur «Meine Zeiten» und «Monatsübersicht».</span>
+</div>
+<div class="app">
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <img src="assets/logo-saniga.svg" alt="SANIGA AG" class="logo-img" width="172" height="31" decoding="async"/>
+    <div class="logo-sub">Zeiterfassung</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-sec">Mitarbeiter</div>
+    <div class="nav-item active" onclick="showView('meine')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Meine Zeiten
+    </div>
+    <div class="nav-item" onclick="showView('monat')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Monatsübersicht
+    </div>
+    <div class="nav-item" onclick="showView('lohn')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Lohnabrechnung
+    </div>
+    <div class="nav-sec admin-only-nav">Geschäftsführung</div>
+    <div class="nav-item admin-only-nav" onclick="showView('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item admin-only-nav" onclick="showView('team')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Team verwalten
+    </div>
+    <div class="nav-item admin-only-nav" onclick="showView('alle')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Alle Einträge
+    </div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-pill">
+      <div class="user-av" id="sAv">UG</div>
+      <div style="flex:1;min-width:0;">
+        <div class="user-n" id="sName">Urim Gashi</div>
+        <div class="user-r" id="sRole">Admin</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topTitle">Meine Zeiten</div>
+    <div class="topbar-date" id="topDate"></div>
+    <span class="demo-pill">DEMO</span>
+    <select id="userSwitcher" onchange="switchUser(this.value)" aria-label="Demo: angemeldeter Benutzer"></select>
+    <span id="demoRoleHint" class="demo-role-hint"></span>
+  </div>
+  <div class="content">
+
+    <div class="view active" id="view-meine">
+      <div class="wstrip" id="weekStrip"></div>
+      <div class="quick-add" onclick="openAdd()">
+        <div class="qa-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        <div>
+          <div class="qa-t">Stunden erfassen</div>
+          <div class="qa-s">Eintrag für heute oder jeden anderen Tag hinzufügen — auch nachträglich</div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Diese Woche</div>
+            <span class="badge bo" id="wkBadge">0h</span>
+          </div>
+          <div id="wkList" style="min-height:60px;"></div>
+        </div>
+        <div>
+          <div class="card mb20" style="padding:20px;">
+            <div class="stat-lbl" style="margin-bottom:8px;" id="mMonthLabel">März 2026 — Fortschritt</div>
+            <div style="font-size:36px;font-weight:800;line-height:1;" id="mHrs">0h</div>
+            <div style="font-size:12px;color:var(--t3);margin-top:4px;margin-bottom:14px;" id="mSub">von 184h Soll</div>
+            <div class="pb" style="margin-bottom:6px;"><div class="pf" id="mProg" style="width:0%;background:linear-gradient(90deg,#12B8E1,#5dceef);"></div></div>
+            <div style="font-size:11px;color:var(--t3);" id="mPct">0% erfüllt</div>
+          </div>
+          <div class="card" style="padding:20px;">
+            <div class="stat-lbl" style="margin-bottom:6px;" id="mLohnLabel">Erwarteter Lohn März</div>
+            <div style="font-size:26px;font-weight:800;color:var(--green);line-height:1;" id="mLohn">CHF 0.–</div>
+            <div style="font-size:12px;color:var(--t3);margin-top:4px;" id="mRate">bei CHF 35.–/h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="view" id="view-monat">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;">
+        <select id="monSel" onchange="renderMonat()" style="width:auto;">
+          <option value="2026-03">März 2026</option>
+          <option value="2026-02">Februar 2026</option>
+          <option value="2026-01">Januar 2026</option>
+        </select>
+        <div style="flex:1;"></div>
+        <button class="btn btn-p" onclick="openAdd()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Eintrag hinzufügen
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" id="monTitle">März 2026</div>
+          <span class="badge bo" id="monBadge">0h</span>
+        </div>
+        <table>
+          <thead><tr><th>Datum</th><th>Von</th><th>Bis</th><th>Pause</th><th>Netto</th><th>Notiz</th><th></th></tr></thead>
+          <tbody id="monBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="view" id="view-dashboard">
+      <div class="stats-grid mb24">
+        <div class="stat-card">
+          <div class="stat-accent" style="background:linear-gradient(90deg,var(--saniga-red),var(--saniga-red-l));"></div>
+          <div class="stat-lbl">Team heute</div>
+          <div class="stat-val" style="color:var(--saniga-red);" id="dAct">—</div>
+          <div class="stat-sub">Einträge erfasst</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-accent" style="background:var(--green);"></div>
+          <div class="stat-lbl">Stunden diese Woche</div>
+          <div class="stat-val" id="dWk">—</div>
+          <div class="stat-sub">alle Mitarbeiter</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-accent" style="background:var(--blue);"></div>
+          <div class="stat-lbl">Stunden März</div>
+          <div class="stat-val" id="dMon">—</div>
+          <div class="stat-sub" id="dMonSub">von Soll</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-accent" style="background:var(--yellow);"></div>
+          <div class="stat-lbl">Lohnkosten März</div>
+          <div class="stat-val" style="font-size:21px;" id="dLohn">—</div>
+          <div class="stat-sub">Brutto geschätzt</div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Teamstatus heute</div>
+            <span class="badge bg"><span class="bdot"></span>Live</span>
+          </div>
+          <div id="dTeam"></div>
+        </div>
+        <div class="card" style="padding:20px;">
+          <div class="card-title" style="margin-bottom:18px;">Woche KW <span id="dKW"></span></div>
+          <div id="dWkProg" style="display:flex;flex-direction:column;gap:16px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="view" id="view-team">
+      <div class="team-toolbar">
+        <label class="team-mon-label">
+          Monat (Profil)
+          <select id="teamMonSel" onchange="renderTeam()">
+            <option value="2026-03">März 2026</option>
+            <option value="2026-02">Februar 2026</option>
+            <option value="2026-01">Januar 2026</option>
+          </select>
+        </label>
+        <div style="flex:1;"></div>
+        <button class="btn btn-p" onclick="openAddEmp()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Mitarbeiter hinzufügen
+        </button>
+      </div>
+      <div class="team-page-layout">
+        <div class="grid3" id="teamGrid"></div>
+        <aside class="card team-profile-aside">
+          <div id="teamProfPlaceholder" class="team-prof-placeholder">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--t4)" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <p>Wählen Sie einen Mitarbeiter in der Liste, um das Profil mit Statistik und letzten Einträgen anzuzeigen.</p>
+          </div>
+          <div id="teamProfBody" class="team-prof-body" style="display:none;">
+            <div class="card-title" style="margin-bottom:14px;">Profil</div>
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+              <div class="emp-av team-prof-av" id="teamProfAv"></div>
+              <div>
+                <div style="font-size:17px;font-weight:800;" id="teamProfName"></div>
+                <div style="font-size:12px;color:var(--t3);font-family:'JetBrains Mono',monospace;" id="teamProfRole"></div>
+              </div>
+            </div>
+            <div class="team-prof-meta">
+              <div><span class="team-prof-k">Mitarbeiter-ID</span><span class="mono" id="teamProfId"></span></div>
+              <div><span class="team-prof-k">Stundenlohn</span><span id="teamProfRate"></span></div>
+              <div><span class="team-prof-k">Soll / Woche</span><span id="teamProfTarget"></span></div>
+            </div>
+            <div style="background:var(--bg);border-radius:var(--radius-s);padding:12px 14px;margin:16px 0;">
+              <div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;" id="teamProfMonthCap"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                  <div style="font-size:10px;color:var(--t3);">Stunden</div>
+                  <div style="font-size:18px;font-weight:800;" id="teamProfHours"></div>
+                </div>
+                <div>
+                  <div style="font-size:10px;color:var(--t3);">Geschätzter Lohn</div>
+                  <div style="font-size:18px;font-weight:800;color:var(--green);" id="teamProfLohn"></div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Letzte Einträge</div>
+            <div id="teamProfEntries" class="team-prof-entries"></div>
+            <div class="team-prof-actions">
+              <button type="button" class="btn btn-d" style="width:100%;justify-content:center;" onclick="removeTeamEmp()">Mitarbeiter löschen</button>
+              <p class="team-prof-del-hint">Entfernt die Person und alle zugehörigen Demo-Zeiteinträge.</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="view" id="view-lohn">
+      <p id="lohnReadOnlyHint" class="lohn-readonly-hint hidden">Sie sehen Ihre Lohnübersicht nur zur Ansicht. Monat wechseln und als PDF drucken ist möglich; Lohn-Parameter bearbeitet die Geschäftsführung.</p>
+      <div class="lohn-toolbar print-toolbar">
+        <span id="lohnEmpSelWrap" class="lohn-admin-only">
+          <select id="lEmpSel" onchange="renderLohn()" style="width:220px;"></select>
+        </span>
+        <select id="lMonSel" onchange="renderLohn()">
+          <option value="2026-03">März 2026</option>
+          <option value="2026-02">Februar 2026</option>
+          <option value="2026-01">Januar 2026</option>
+        </select>
+        <div style="flex:1;"></div>
+        <button class="btn btn-g" type="button" onclick="exportLohnPdf()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          PDF exportieren
+        </button>
+      </div>
+      <div class="card payroll-rules-card" style="padding:20px 22px;margin-bottom:20px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px;">
+          <div>
+            <div class="card-title" style="margin-bottom:6px;">Lohn-Parameter</div>
+            <p style="font-size:12px;color:var(--t3);line-height:1.45;max-width:720px;">Hier steuern Sie Spesen und Abzugszeilen für diese Übersicht. Der <strong>Stundenlohn</strong> pro Person kommt aus «Mitarbeiter hinzufügen» / Stammdaten (Feld Stundenlohn), nicht von hier. Steuer/Sozialabzüge sind vereinfacht: Prozent bezieht sich jeweils auf das <strong>Brutto</strong> (Basislohn + Spesen).</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-g" onclick="payrollAddDeduction()">Abzugszeile</button>
+            <button type="button" class="btn btn-g" onclick="payrollReset()">Standard</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom:14px;max-width:280px;">
+          <div class="fg">
+            <label>Spesen pro Zeiteintrag (CHF)</label>
+            <input type="number" id="paySpesen" min="0" step="0.5" value="15" oninput="persistPayrollFromForm()">
+          </div>
+        </div>
+        <div id="payrollDeductionRows" class="payroll-deduction-rows"></div>
+      </div>
+      <div class="grid2">
+        <div class="card" style="padding:26px;">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+            <div class="emp-av" id="lAv"></div>
+            <div>
+              <div style="font-size:18px;font-weight:800;" id="lName"></div>
+              <div style="font-size:12px;color:var(--t3);font-family:'JetBrains Mono';" id="lRole"></div>
+              <div style="font-size:13px;color:var(--t2);margin-top:6px;font-weight:600;" id="lPeriodLabel"></div>
+            </div>
+          </div>
+          <hr class="div">
+          <div id="lBreakdown"></div>
+          <hr class="div">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">TOTAL BRUTTO</span>
+            <span style="font-size:26px;font-weight:800;color:var(--green);" id="lTotal"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
+            <span style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">Auszahlung (Netto)</span>
+            <span style="font-size:22px;font-weight:800;color:var(--t1);" id="lNetto">CHF 0.00</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Stundennachweis</div></div>
+          <table>
+            <thead><tr><th>Woche</th><th>Soll</th><th>Ist</th><th>Diff</th></tr></thead>
+            <tbody id="lWks"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="view" id="view-alle">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;">
+        <select id="aEmpF" onchange="renderAlle()" style="width:180px;"><option value="">Alle Mitarbeiter</option></select>
+        <input type="date" id="aFrom" value="2026-03-01" onchange="renderAlle()" style="width:150px;">
+        <input type="date" id="aTo" value="2026-03-28" onchange="renderAlle()" style="width:150px;">
+        <div style="flex:1;"></div>
+        <button class="btn btn-p" onclick="openAdd()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Eintrag hinzufügen
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Zeiteinträge</div>
+          <span class="badge bo" id="aCount">0</span>
+        </div>
+        <table>
+          <thead><tr><th>Mitarbeiter</th><th>Datum</th><th>Von</th><th>Bis</th><th>Pause</th><th>Netto</th><th>Notiz</th><th></th></tr></thead>
+          <tbody id="aBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<div class="mo" id="moEntry">
+  <div class="mo-box">
+    <div class="mo-title" id="mEntryTitle">Stunden erfassen</div>
+    <div class="mo-sub" id="mEntrySub">Du kannst Einträge für jeden beliebigen Tag hinzufügen — auch nachträglich.</div>
+    <div class="form-row" style="margin-bottom:14px;">
+      <div class="fg" id="eEmpFg"><label>Mitarbeiter</label><select id="eEmp"></select></div>
+      <div class="fg" id="eDateFg"><label>Datum</label><input type="date" id="eDate"></div>
+    </div>
+    <div class="form-row3" style="margin-bottom:14px;">
+      <div class="fg"><label>Von</label><input type="time" id="eFrom" value="07:00"></div>
+      <div class="fg"><label>Bis</label><input type="time" id="eTo" value="16:30"></div>
+      <div class="fg"><label>Pause (Min.)</label><input type="number" id="eBrk" value="30" min="0" max="120"></div>
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Projekt / Notiz (optional)</label>
+      <input type="text" id="eNote" placeholder="z.B. Baustelle Hinwil">
+    </div>
+    <div style="background:rgba(18,184,225,.07);border:1px solid rgba(18,184,225,.2);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:16px;">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">Nettoarbeitszeit</div>
+        <div style="font-size:24px;font-weight:800;color:var(--saniga-red);margin-top:2px;" id="eCalc">—</div>
+      </div>
+      <div style="width:1px;height:40px;background:var(--border);"></div>
+      <div style="font-size:12px;color:var(--t2);">Brutto – Pause = Nettozeit.<br>Diese wird für den Lohn berechnet.</div>
+    </div>
+    <div class="mo-actions">
+      <button class="btn btn-d" id="eDel" onclick="deleteEntry()" style="margin-right:auto;display:none;">Löschen</button>
+      <button class="btn btn-g" onclick="closeM('moEntry')">Abbrechen</button>
+      <button class="btn btn-p" onclick="saveEntry()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="mo" id="moEmp">
+  <div class="mo-box">
+    <div class="mo-title">Mitarbeiter hinzufügen</div>
+    <div class="mo-sub">Nur in dieser Demo – wird nicht gespeichert, wenn Sie die Seite schliessen.</div>
+    <div class="form-row" style="margin-bottom:14px;">
+      <div class="fg"><label>Vorname</label><input type="text" id="eFirst" placeholder="Marco"></div>
+      <div class="fg"><label>Nachname</label><input type="text" id="eLast" placeholder="Huber"></div>
+    </div>
+    <div class="form-row" style="margin-bottom:14px;">
+      <div class="fg"><label>Funktion</label>
+        <select id="eRole">
+          <option>Monteur Sanitär</option>
+          <option>Monteur Heizung</option>
+          <option>Monteur Lüftung</option>
+          <option>Lehrling</option>
+        </select>
+      </div>
+      <div class="fg"><label>Stundenlohn (CHF)</label><input type="number" id="eRate" value="35"></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Soll-Stunden/Woche</label><input type="number" id="eTarget" value="45"></div>
+      <div class="fg"><label>Eintrittsdatum</label><input type="date" id="eStart" value="2026-03-28"></div>
+    </div>
+    <div class="mo-actions">
+      <button class="btn btn-g" onclick="closeM('moEmp')">Abbrechen</button>
+      <button class="btn btn-p" onclick="addEmp()">Hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toastMsg"></span>
+</div>
+
+<script src="demo-app.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: saniga
+    ports:
+      - "5432:5432"
+    volumes:
+      - saniga_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d saniga"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  saniga_pgdata:

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Saniga Zeiterfassung</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1.25rem; line-height: 1.6; color: #1a2332; }
+    code { background: #f0f2f7; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+    a { color: #12B8E1; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Saniga Zeiterfassung</h1>
+  <p><strong>Nur anschauen (ohne Node.js):</strong> Datei <code>demo.html</code> doppelklicken, oder mit <strong>Link im Browser</strong> (Python nötig):</p>
+  <p><strong>Ohne Python:</strong> im Ordner <code>Saniga</code> in PowerShell:</p>
+  <pre><code>powershell -ExecutionPolicy Bypass -File .\serve_demo.ps1</code></pre>
+  <p>Oder doppelklick auf <code>serve_demo.cmd</code>. Link: <code>http://127.0.0.1:8765/demo.html</code></p>
+  <p><strong>Mit Python:</strong> <code>py serve_demo.py</code> oder <code>python serve_demo.py</code> — mit <code>--lan</code> für andere Geräte im WLAN.</p>
+  <p>Direkt ohne Server: <a href="demo.html">demo.html</a> öffnen</p>
+  <p><strong>Mit Server &amp; Datenbank:</strong> Docker Desktop + Node.js, dann im Projektordner:</p>
+  <pre><code>python run.py</code></pre>
+  <p>Oder manuell im Ordner <code>server</code>:</p>
+  <pre><code>cd server
+npm install
+npx prisma migrate deploy
+npm run dev</code></pre>
+  <p>Anschliessend im Browser öffnen: <a href="http://localhost:3000">http://localhost:3000</a> — Registrierung für Mitarbeitende: <a href="http://localhost:3000/join.html">/join.html</a></p>
+  <p>Siehe <code>README.md</code> für Railway und Umgebungsvariablen.</p>
+</body>
+</html>

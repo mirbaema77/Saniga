@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Registrieren – Saniga Zeiterfassung</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --saniga-red: #12B8E1;
+  --saniga-red-l: #45cae9;
+  --bg: #eef5f8;
+  --border: rgba(22,48,58,0.09);
+  --t1: #152830;
+  --t2: #4a6570;
+  --t3: #7d939c;
+  --radius: 16px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--t1); min-height: 100vh; padding: 24px; font-size: 14px; }
+.wrap { max-width: 440px; margin: 0 auto; padding-top: 8vh; }
+.card {
+  background: white; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 28px; box-shadow: 0 8px 32px rgba(26,35,50,.08);
+}
+h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+p.sub { color: var(--t3); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+.fg { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+label { font-size: 11.5px; font-weight: 600; color: var(--t2); }
+input, select {
+  border: 1.5px solid rgba(26,35,50,0.16); border-radius: 9px; padding: 10px 12px;
+  font-size: 14px; font-family: inherit; width: 100%;
+}
+input:focus, select:focus { outline: none; border-color: var(--saniga-red); box-shadow: 0 0 0 3px rgba(18,184,225,.15); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 18px; border-radius: 9px; font-size: 14px; font-weight: 600;
+  cursor: pointer; border: none; font-family: inherit; width: 100%; margin-top: 6px;
+  background: linear-gradient(135deg, var(--saniga-red), var(--saniga-red-l)); color: white;
+}
+.btn:hover { opacity: 0.95; }
+.err { color: #dc2626; font-size: 13px; margin-top: 12px; display: none; }
+.back { text-align: center; margin-top: 18px; }
+.back a { color: var(--saniga-red); font-weight: 600; text-decoration: none; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>Konto erstellen</h1>
+    <p class="sub">Geben Sie den Einladungscode ein, den Sie von der Geschäftsleitung erhalten haben. Anschliessend können Sie Ihre Arbeitszeiten erfassen.</p>
+    <div class="fg">
+      <label>Einladungscode</label>
+      <input type="text" id="inviteCode" autocomplete="off" placeholder="z.B. SANIGA-2026">
+    </div>
+    <div class="fg">
+      <label>E-Mail (für Login)</label>
+      <input type="email" id="email" autocomplete="username" placeholder="name@firma.ch">
+    </div>
+    <div class="fg">
+      <label>Passwort (mind. 8 Zeichen)</label>
+      <input type="password" id="password" autocomplete="new-password" placeholder="••••••••">
+    </div>
+    <div class="row2">
+      <div class="fg" style="margin-bottom:0;">
+        <label>Vorname</label>
+        <input type="text" id="firstName" placeholder="Vorname">
+      </div>
+      <div class="fg" style="margin-bottom:0;">
+        <label>Nachname</label>
+        <input type="text" id="lastName" placeholder="Nachname">
+      </div>
+    </div>
+    <div class="fg">
+      <label>Funktion</label>
+      <select id="jobTitle">
+        <option>Monteur Sanitär</option>
+        <option>Monteur Heizung</option>
+        <option>Monteur Lüftung</option>
+        <option>Lehrling</option>
+        <option>Mitarbeiter</option>
+      </select>
+    </div>
+    <button type="button" class="btn" id="regBtn">Registrieren &amp; anmelden</button>
+    <p class="err" id="err"></p>
+    <div class="back"><a href="/">Zurück zur Anmeldung</a></div>
+  </div>
+</div>
+<script>
+const TOKEN_KEY = 'saniga_token';
+
+document.getElementById('regBtn').addEventListener('click', async () => {
+  const err = document.getElementById('err');
+  err.style.display = 'none';
+  const body = {
+    inviteCode: document.getElementById('inviteCode').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    password: document.getElementById('password').value,
+    firstName: document.getElementById('firstName').value.trim(),
+    lastName: document.getElementById('lastName').value.trim(),
+    jobTitle: document.getElementById('jobTitle').value,
+  };
+  try {
+    const r = await fetch('/api/auth/register-employee', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'Registrierung fehlgeschlagen');
+    localStorage.setItem(TOKEN_KEY, data.token);
+    window.location.href = '/';
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>

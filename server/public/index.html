@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Saniga AG â€“ Zeiterfassung</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --saniga-red:   #12B8E1;
+  --saniga-red-l: #45cae9;
+  --saniga-dark:  #1a2e36;
+  --saniga-mid:   #2a4a55;
+  --bg:          #eef5f8;
+  --glass:       rgba(255,255,255,0.72);
+  --glass-b:     rgba(255,255,255,0.92);
+  --card:        #ffffff;
+  --border:      rgba(22,48,58,0.09);
+  --border-med:  rgba(22,48,58,0.13);
+  --t1: #152830;
+  --t2: #4a6570;
+  --t3: #7d939c;
+  --t4: #b8c9d0;
+  --green:   #0d9488;
+  --green-b: rgba(13,148,136,.10);
+  --yellow:  #d97706;
+  --yellow-b:rgba(217,119,6,.10);
+  --red:     #dc2626;
+  --red-b:   rgba(220,38,38,.10);
+  --blue:    #0e7490;
+  --blue-b:  rgba(14,116,144,.12);
+  --radius:  16px;
+  --radius-s: 12px;
+  --shadow:  0 1px 8px rgba(22,48,58,.06), 0 1px 2px rgba(22,48,58,.04);
+  --shadow-l:0 12px 40px rgba(22,48,58,.08), 0 4px 12px rgba(22,48,58,.05);
+  --shadow-xl:0 24px 64px rgba(22,48,58,.12), 0 8px 20px rgba(22,48,58,.06);
+}
+
+* { box-sizing: border-box; }
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--bg);
+  color: var(--t1);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.app { display:flex; min-height:100vh; }
+
+/* â”€â”€ SIDEBAR â”€â”€ */
+.sidebar {
+  width: 252px; flex-shrink: 0;
+  background: linear-gradient(175deg, #1a2e36 0%, #15282f 100%);
+  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh;
+  z-index: 20;
+}
+.sidebar::after {
+  content:''; position:absolute; top:0; right:0;
+  width:1px; height:100%;
+  background: linear-gradient(180deg, rgba(18,184,225,.35) 0%, transparent 55%);
+}
+.sidebar-logo {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  display:flex; flex-direction:column; align-items:flex-start; gap:10px;
+}
+.logo-img {
+  height: 28px;
+  width: auto;
+  max-width: 100%;
+  display: block;
+}
+.logo-sub  { font-size:10px;color:rgba(255,255,255,.34);font-family:'JetBrains Mono';letter-spacing:.5px; }
+.nav { padding:12px 10px;flex:1; }
+.nav-sec { font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.28);padding:14px 10px 6px;font-family:'JetBrains Mono'; }
+.nav-item {
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;border-radius:12px;cursor:pointer;
+  color:rgba(255,255,255,.48);transition:background .2s,color .2s;
+  font-size:13.5px;font-weight:500;margin-bottom:3px;user-select:none;
+}
+.nav-item:hover { background:rgba(255,255,255,.08);color:rgba(255,255,255,.88); }
+.nav-item.active {
+  background:rgba(18,184,225,.22);
+  color:#e8f9fd;
+  box-shadow:0 2px 12px rgba(0,0,0,.12);
+  border:1px solid rgba(18,184,225,.25);
+}
+.nav-item svg { width:15px;height:15px;flex-shrink:0;opacity:.8; }
+.nav-item.active svg { opacity:1; }
+.sidebar-bottom { padding:14px 12px;border-top:1px solid rgba(255,255,255,.08); }
+.user-pill {
+  display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border-radius:10px;background:rgba(255,255,255,.06);cursor:pointer;transition:background .15s;
+}
+.user-pill:hover { background:rgba(255,255,255,.1); }
+.user-av { width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:white;flex-shrink:0; }
+.user-n { font-size:13px;font-weight:600;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.user-r { font-size:10px;color:rgba(255,255,255,.38);font-family:'JetBrains Mono'; }
+
+/* â”€â”€ MAIN â”€â”€ */
+.main { flex:1;display:flex;flex-direction:column;min-width:0; }
+.topbar {
+  height:60px;background:var(--glass-b);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 28px;gap:14px;
+  position:sticky;top:0;z-index:10;
+}
+.topbar-title { font-size:18px;font-weight:700;flex:1;color:var(--t1); }
+.topbar-date { font-family:'JetBrains Mono';font-size:11px;color:var(--t3);background:var(--bg);border:1px solid var(--border);padding:4px 10px;border-radius:6px; }
+#userSwitcher { background:var(--bg);border:1px solid var(--border-med);color:var(--t2);padding:6px 10px;border-radius:8px;font-size:12px;font-family:'JetBrains Mono';cursor:pointer; }
+.content { flex:1;padding:28px;overflow-y:auto; }
+
+/* â”€â”€ VIEWS â”€â”€ */
+.view { display:none;animation:fadeUp .22s ease; }
+.view.active { display:block; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+/* â”€â”€ CARDS â”€â”€ */
+.card { background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow); }
+.card-header { padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
+.card-title { font-size:15px;font-weight:700;flex:1;color:var(--t1); }
+
+/* â”€â”€ STATS â”€â”€ */
+.stats-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px; }
+.stat-card { background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow);position:relative;overflow:hidden; }
+.stat-accent { position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius) var(--radius) 0 0; }
+.stat-lbl { font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px; }
+.stat-val { font-size:30px;font-weight:800;color:var(--t1);line-height:1; }
+.stat-sub { font-size:12px;color:var(--t3);margin-top:5px; }
+
+/* â”€â”€ GRID â”€â”€ */
+.grid2 { display:grid;grid-template-columns:1fr 1fr;gap:20px; }
+.grid3 { display:grid;grid-template-columns:repeat(3,1fr);gap:16px; }
+.mb20 { margin-bottom:20px; }
+.mb24 { margin-bottom:24px; }
+
+/* â”€â”€ TABLE â”€â”€ */
+table { width:100%;border-collapse:collapse; }
+thead th { text-align:left;padding:10px 18px;font-size:10.5px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);background:rgba(238,248,252,.65); }
+tbody tr { border-bottom:1px solid var(--border);transition:background .1s; }
+tbody tr:last-child { border-bottom:none; }
+tbody tr:hover { background:rgba(240,242,247,.6); }
+td { padding:12px 18px;font-size:13.5px;color:var(--t1); }
+
+/* â”€â”€ BADGES â”€â”€ */
+.badge { display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;font-family:'JetBrains Mono'; }
+.bg  { background:var(--green-b);color:var(--green); }
+.br  { background:var(--red-b);color:var(--red); }
+.by  { background:var(--yellow-b);color:var(--yellow); }
+.bb  { background:var(--blue-b);color:var(--blue); }
+.bo  { background:rgba(18,184,225,.12);color:#0e7490; }
+.bdot { width:6px;height:6px;border-radius:50%;background:currentColor; }
+
+/* â”€â”€ BUTTONS â”€â”€ */
+.btn { display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .16s;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap; }
+.btn svg { width:14px;height:14px; }
+.btn-p { background:linear-gradient(135deg,#12B8E1,#3dc4ea);color:white;box-shadow:0 4px 16px rgba(18,184,225,.28); }
+.btn-p:hover { transform:translateY(-1px);box-shadow:0 8px 22px rgba(18,184,225,.34); }
+.btn-g { background:var(--bg);color:var(--t2);border:1px solid var(--border-med); }
+.btn-g:hover { background:white;border-color:var(--t3); }
+.btn-d { background:var(--red-b);color:var(--red);border:1px solid rgba(220,38,38,.2); }
+.btn-d:hover { background:var(--red);color:white; }
+
+/* â”€â”€ FORMS â”€â”€ */
+.form-row  { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
+.form-row3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px; }
+.fg { display:flex;flex-direction:column;gap:6px; }
+.fg.full { grid-column:1/-1; }
+label { font-size:11.5px;font-weight:600;color:var(--t2);letter-spacing:.3px; }
+input,select,textarea {
+  background:var(--bg);border:1.5px solid var(--border-med);border-radius:9px;
+  padding:9px 13px;color:var(--t1);font-size:13.5px;
+  font-family:'Plus Jakarta Sans',sans-serif;width:100%;transition:border-color .15s,box-shadow .15s;
+}
+input:focus,select:focus,textarea:focus { outline:none;border-color:var(--saniga-red);box-shadow:0 0 0 3px rgba(18,184,225,.12);background:white; }
+select option { background:white; }
+
+/* â”€â”€ MODAL â”€â”€ */
+.mo { position:fixed;inset:0;background:rgba(26,35,50,.42);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .22s; }
+.mo.open { opacity:1;pointer-events:all; }
+.mo-box { background:white;border:1px solid var(--border);border-radius:18px;width:520px;max-width:95vw;padding:28px;box-shadow:var(--shadow-xl);transform:scale(.96) translateY(8px);transition:transform .22s; }
+.mo.open .mo-box { transform:scale(1) translateY(0); }
+.mo-title { font-size:20px;font-weight:800;color:var(--t1);margin-bottom:5px; }
+.mo-sub { font-size:13px;color:var(--t2);margin-bottom:22px; }
+.mo-actions { display:flex;justify-content:flex-end;gap:10px;margin-top:24px; }
+
+/* â”€â”€ ENTRY LIST â”€â”€ */
+.ei { display:flex;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid var(--border);transition:background .12s; }
+.ei:last-child { border-bottom:none; }
+.ei:hover { background:rgba(240,242,247,.6); }
+.ei-dot { width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0; }
+.ei-date { font-family:'JetBrains Mono';font-size:11.5px;color:var(--t3);width:76px;flex-shrink:0; }
+.ei-time { font-family:'JetBrains Mono';font-size:12.5px;color:var(--t2);width:110px;flex-shrink:0; }
+.ei-dur  { font-family:'JetBrains Mono';font-size:13px;font-weight:500;color:var(--t1);width:58px;flex-shrink:0; }
+.ei-note { font-size:13px;color:var(--t3);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.ei-acts { display:flex;gap:6px;opacity:0;transition:opacity .15s; }
+.ei:hover .ei-acts { opacity:1; }
+.ib { width:28px;height:28px;border-radius:7px;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s; }
+.ib:hover { background:white;border-color:var(--t3); }
+.ib svg { width:13px;height:13px; }
+.ib.del:hover { background:var(--red-b);border-color:rgba(220,38,38,.3);color:var(--red); }
+
+/* â”€â”€ QUICK ADD â”€â”€ */
+.quick-add {
+  background:linear-gradient(135deg,rgba(18,184,225,.05),rgba(61,200,234,.03));
+  border:1.5px dashed rgba(18,184,225,.28);border-radius:var(--radius);
+  padding:16px 20px;display:flex;align-items:center;gap:14px;cursor:pointer;
+  transition:all .18s;margin-bottom:20px;
+}
+.quick-add:hover { background:rgba(18,184,225,.07);border-color:var(--saniga-red); }
+.qa-icon { width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,var(--saniga-red),var(--saniga-red-l));display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(18,184,225,.28);flex-shrink:0; }
+.qa-icon svg { width:16px;height:16px;color:white; }
+.qa-t { font-size:14px;font-weight:600;color:var(--saniga-red); }
+.qa-s { font-size:12px;color:var(--t3);margin-top:1px; }
+
+/* â”€â”€ WEEK STRIP â”€â”€ */
+.wstrip { display:flex;gap:8px;margin-bottom:22px; }
+.wd {
+  flex:1;background:white;border:1px solid var(--border);border-radius:var(--radius-s);
+  padding:12px 8px;text-align:center;cursor:pointer;transition:all .15s;
+  box-shadow:var(--shadow);position:relative;
+}
+.wd:hover { border-color:var(--saniga-red);transform:translateY(-1px); }
+.wd.today { border-color:var(--saniga-red);background:linear-gradient(135deg,rgba(18,184,225,.05),rgba(61,200,234,.03)); }
+.wd.has-entry::after { content:'';position:absolute;bottom:7px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--green); }
+.wd-n { font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px; }
+.wd-d { font-size:20px;font-weight:800;color:var(--t1);margin:2px 0; }
+.wd-h { font-size:10.5px;font-family:'JetBrains Mono';color:var(--t2); }
+
+/* â”€â”€ PROGRESS â”€â”€ */
+.pb { height:8px;background:var(--bg);border-radius:4px;overflow:hidden; }
+.pf { height:100%;border-radius:4px;transition:width .4s; }
+
+/* â”€â”€ EMP CARD â”€â”€ */
+.emp-card { background:white;border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);transition:box-shadow .18s,transform .18s,border-color .18s; }
+.emp-card:hover { box-shadow:var(--shadow-l);transform:translateY(-2px); }
+.emp-av { width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:white;flex-shrink:0; }
+.team-toolbar { display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:20px; }
+.team-mon-label { display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2); }
+.team-mon-label select { padding:8px 12px;border-radius:9px;border:1px solid var(--border);background:white;font-size:13px;font-family:inherit;color:var(--t1);width:auto;min-width:160px; }
+.team-page-layout { display:grid;grid-template-columns:1fr minmax(280px,340px);gap:20px;align-items:start; }
+@media (max-width:980px) { .team-page-layout { grid-template-columns:1fr; } }
+.team-profile-aside { padding:22px;position:sticky;top:24px; }
+.team-prof-placeholder { text-align:center;padding:28px 16px;color:var(--t3);font-size:13px;line-height:1.55; }
+.team-prof-placeholder svg { display:block;margin:0 auto 14px; }
+.team-prof-placeholder p { max-width:240px;margin:0 auto; }
+.team-prof-meta { display:flex;flex-direction:column;gap:10px;font-size:13px; }
+.team-prof-k { color:var(--t3);display:inline-block;min-width:120px;margin-right:8px; }
+.team-prof-av { width:52px;height:52px;font-size:19px; }
+.team-prof-entries { display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto; }
+.team-prof-row { font-size:12px;padding:10px 12px;background:var(--bg);border-radius:9px;border:1px solid var(--border); }
+.team-prof-row .mono { color:var(--t2); }
+.emp-card.team-emp-pick { cursor:pointer;outline:none; }
+.emp-card.team-emp-pick:focus-visible { box-shadow:var(--shadow-l);outline:2px solid var(--blue);outline-offset:2px; }
+.emp-card.team-emp-pick.is-selected { border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-b),var(--shadow);transform:translateY(0); }
+.team-prof-actions { margin-top:16px;padding-top:16px;border-top:1px solid var(--border); }
+.team-prof-del-hint { font-size:11px;color:var(--t3);margin-top:10px;line-height:1.45; }
+
+/* â”€â”€ SALARY â”€â”€ */
+.sal-row { display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border); }
+.sal-row:last-child { border-bottom:none; }
+.payroll-rules-card .payroll-deduction-rows { margin-top:4px; }
+.payroll-ded-row { display:grid;grid-template-columns:1fr 130px 100px 44px;gap:8px;align-items:end;margin-bottom:10px; }
+@media (max-width:700px) { .payroll-ded-row { grid-template-columns:1fr 1fr; } .payroll-ded-row .btn-d { grid-column:1 / -1;justify-self:start; } }
+
+/* â”€â”€ SCROLLBAR â”€â”€ */
+::-webkit-scrollbar { width:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border-med);border-radius:10px; }
+
+/* â”€â”€ TOAST â”€â”€ */
+.toast { position:fixed;bottom:24px;right:24px;background:var(--saniga-dark);color:white;border-radius:12px;padding:14px 18px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-xl);z-index:300;transform:translateY(80px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);max-width:320px; }
+.toast.show { transform:translateY(0);opacity:1; }
+.toast svg { width:18px;height:18px;color:var(--saniga-red-l);flex-shrink:0; }
+
+hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
+.mono { font-family:'JetBrains Mono'; }
+.hidden { display: none !important; }
+#authGate { min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg); }
+.auth-card { background:white;border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:420px;width:100%;box-shadow:var(--shadow-l); }
+.auth-card h1 { font-size:22px;font-weight:800;margin-bottom:6px;color:var(--t1); }
+.auth-card > p { color:var(--t3);font-size:13px;margin-bottom:20px; }
+.auth-card a { color:var(--saniga-red);font-weight:600;font-size:13px; }
+#mainApp { display:none; }
+#mainApp.visible { display:flex; }
+.lohn-toolbar { display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap; }
+.lohn-readonly-hint {
+  font-size:13px;color:var(--t2);line-height:1.5;
+  background:rgba(18,184,225,.08);
+  border:1px solid rgba(18,184,225,.18);
+  border-radius:var(--radius-s);
+  padding:12px 16px;
+  margin-bottom:16px;
+}
+@media print {
+  .sidebar, .topbar { display:none !important; }
+  #mainApp { display:block !important; }
+  .app { min-height:auto;display:block !important; }
+  .main { width:100% !important;margin:0 !important; }
+  .content { padding:12px !important;overflow:visible !important; }
+  .lohn-toolbar { display:none !important; }
+  .payroll-rules-card, .lohn-admin-only { display:none !important; }
+  #lohnReadOnlyHint { display:none !important; }
+  .card { box-shadow:none !important;border:1px solid #ddd !important; break-inside:avoid; }
+  body { background:white !important; }
+}
+</style>
+</head>
+<body>
+<div id="authGate">
+  <div class="auth-card">
+    <h1>Saniga Zeiterfassung</h1>
+    <p>Anmelden mit Ihrer E-Mail und Ihrem Passwort. Mitarbeitende ohne Konto kÃ¶nnen sich Ã¼ber den Einladungslink registrieren.</p>
+    <p style="font-size:12px;color:var(--t3);line-height:1.45;">Alle sehen « Lohnabrechnung » (eigene Übersicht; PDF-Druck). Konten mit Rolle <strong>Admin</strong> sehen zusätzlich « Geschäftsführung » (Dashboard, Team, alle Einträge) und können Lohn-Parameter bearbeiten.</p>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>E-Mail</label>
+      <input type="email" id="loginEmail" autocomplete="username" placeholder="name@firma.ch">
+    </div>
+    <div class="fg" style="margin-bottom:18px;">
+      <label>Passwort</label>
+      <input type="password" id="loginPassword" autocomplete="current-password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
+    </div>
+    <button type="button" class="btn btn-p" style="width:100%;justify-content:center;margin-bottom:14px;" id="loginBtn">Anmelden</button>
+    <div style="text-align:center;">
+      <a href="/join.html">Als Mitarbeitende:r registrieren â†’</a>
+    </div>
+    <p id="loginErr" style="color:var(--red);font-size:13px;margin-top:14px;display:none;"></p>
+  </div>
+</div>
+<div class="app" id="mainApp">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <img src="/assets/logo-saniga.svg" alt="SANIGA AG" class="logo-img" width="172" height="31" decoding="async"/>
+    <div class="logo-sub">Zeiterfassung</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-sec">Mitarbeiter</div>
+    <div class="nav-item active" onclick="showView('meine')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Meine Zeiten
+    </div>
+    <div class="nav-item" onclick="showView('monat')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      MonatsÃ¼bersicht
+    </div>
+    <div class="nav-item" onclick="showView('lohn')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Lohnabrechnung
+    </div>
+    <div class="nav-sec admin-only-nav hidden">Admin</div>
+    <div class="nav-item admin-only-nav hidden" onclick="showView('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item admin-only-nav hidden" onclick="showView('team')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Team verwalten
+    </div>
+    <div class="nav-item admin-only-nav hidden" onclick="showView('alle')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Alle EintrÃ¤ge
+    </div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-pill">
+      <div class="user-av" id="sAv">MH</div>
+      <div style="flex:1;min-width:0;">
+        <div class="user-n" id="sName">Marco Huber</div>
+        <div class="user-r" id="sRole">Monteur SanitÃ¤r</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topTitle">Meine Zeiten</div>
+    <div class="topbar-date" id="topDate"></div>
+    <a href="/join.html" id="inviteLink" class="btn btn-g admin-only-nav hidden" style="text-decoration:none;">Link fÃ¼r Mitarbeitende</a>
+    <span id="userSwitchWrap" class="admin-only-nav hidden">
+      <select id="userSwitcher" onchange="switchUser(this.value)"></select>
+    </span>
+    <button type="button" class="btn btn-g" id="logoutBtn">Abmelden</button>
+  </div>
+  <div class="content">
+
+    <!-- â•â•â• MEINE ZEITEN â•â•â• -->
+    <div class="view active" id="view-meine">
+      <div class="wstrip" id="weekStrip"></div>
+      <div class="quick-add" onclick="openAdd()">
+        <div class="qa-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+        <div>
+          <div class="qa-t">Stunden erfassen</div>
+          <div class="qa-s">Eintrag fÃ¼r heute oder jeden anderen Tag hinzufÃ¼gen â€” auch nachtrÃ¤glich</div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Diese Woche</div>
+            <span class="badge bo" id="wkBadge">0h</span>
+          </div>
+          <div id="wkList" style="min-height:60px;"></div>
+        </div>
+        <div>
+          <div class="card mb20" style="padding:20px;">
+            <div class="stat-lbl" style="margin-bottom:8px;" id="mMonthLabel">â€” Fortschritt</div>
+            <div style="font-size:36px;font-weight:800;line-height:1;" id="mHrs">0h</div>
+            <div style="font-size:12px;color:var(--t3);margin-top:4px;margin-bottom:14px;" id="mSub">von 184h Soll</div>
+            <div class="pb" style="margin-bottom:6px;"><div class="pf" id="mProg" style="width:0%;background:linear-gradient(90deg,var(--saniga-red),var(--saniga-red-l));"></div></div>
+            <div style="font-size:11px;color:var(--t3);" id="mPct">0% erfÃ¼llt</div>
+          </div>
+          <div class="card" style="padding:20px;">
+            <div class="stat-lbl" style="margin-bottom:6px;" id="mLohnLabel">Erwarteter Lohn</div>
+            <div style="font-size:26px;font-weight:800;color:var(--green);line-height:1;" id="mLohn">CHF 0.â€“</div>
+            <div style="font-size:12px;color:var(--t3);margin-top:4px;" id="mRate">bei CHF 35.â€“/h</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- â•â•â• MONATSÃœBERSICHT â•â•â• -->
+    <div class="view" id="view-monat">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;">
+        <select id="monSel" onchange="renderMonat()" style="width:auto;"></select>
+        <div style="flex:1;"></div>
+        <button class="btn btn-p" onclick="openAdd()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Eintrag hinzufÃ¼gen
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" id="monTitle">MÃ¤rz 2026</div>
+          <span class="badge bo" id="monBadge">0h</span>
+        </div>
+        <table>
+          <thead><tr><th>Datum</th><th>Von</th><th>Bis</th><th>Pause</th><th>Netto</th><th>Notiz</th><th></th></tr></thead>
+          <tbody id="monBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- â•â•â• DASHBOARD â•â•â• -->
+    <div class="view" id="view-dashboard">
+      <div class="stats-grid mb24">
+        <div class="stat-card">
+          <div class="stat-accent" style="background:linear-gradient(90deg,var(--saniga-red),var(--saniga-red-l));"></div>
+          <div class="stat-lbl">Team heute</div>
+          <div class="stat-val" style="color:var(--saniga-red);" id="dAct">â€”</div>
+          <div class="stat-sub">EintrÃ¤ge erfasst</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-accent" style="background:var(--green);"></div>
+          <div class="stat-lbl">Stunden diese Woche</div>
+          <div class="stat-val" id="dWk">â€”</div>
+          <div class="stat-sub">alle Mitarbeiter</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-accent" style="background:var(--blue);"></div>
+          <div class="stat-lbl">Stunden MÃ¤rz</div>
+          <div class="stat-val" id="dMon">â€”</div>
+          <div class="stat-sub" id="dMonSub">von Soll</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-accent" style="background:var(--yellow);"></div>
+          <div class="stat-lbl">Lohnkosten MÃ¤rz</div>
+          <div class="stat-val" style="font-size:21px;" id="dLohn">â€”</div>
+          <div class="stat-sub">Brutto geschÃ¤tzt</div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Teamstatus heute</div>
+            <span class="badge bg"><span class="bdot"></span>Live</span>
+          </div>
+          <div id="dTeam"></div>
+        </div>
+        <div class="card" style="padding:20px;">
+          <div class="card-title" style="margin-bottom:18px;">Woche KW <span id="dKW"></span></div>
+          <div id="dWkProg" style="display:flex;flex-direction:column;gap:16px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEAM -->
+    <div class="view" id="view-team">
+      <div class="team-toolbar">
+        <label class="team-mon-label">
+          Monat (Profil)
+          <select id="teamMonSel" onchange="renderTeam()"></select>
+        </label>
+        <div style="flex:1;"></div>
+        <button class="btn btn-p" onclick="openAddEmp()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Mitarbeiter hinzufÃ¼gen
+        </button>
+      </div>
+      <div class="team-page-layout">
+        <div class="grid3" id="teamGrid"></div>
+        <aside class="card team-profile-aside">
+          <div id="teamProfPlaceholder" class="team-prof-placeholder">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--t4)" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <p>Wählen Sie einen Mitarbeiter in der Liste, um das Profil mit Statistik und letzten Einträgen anzuzeigen.</p>
+          </div>
+          <div id="teamProfBody" class="team-prof-body" style="display:none;">
+            <div class="card-title" style="margin-bottom:14px;">Profil</div>
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+              <div class="emp-av team-prof-av" id="teamProfAv"></div>
+              <div>
+                <div style="font-size:17px;font-weight:800;" id="teamProfName"></div>
+                <div style="font-size:12px;color:var(--t3);font-family:'JetBrains Mono',monospace;" id="teamProfRole"></div>
+              </div>
+            </div>
+            <div class="team-prof-meta">
+              <div><span class="team-prof-k">Mitarbeiter-ID</span><span class="mono" id="teamProfId"></span></div>
+              <div><span class="team-prof-k">Stundenlohn</span><span id="teamProfRate"></span></div>
+              <div><span class="team-prof-k">Soll / Woche</span><span id="teamProfTarget"></span></div>
+            </div>
+            <div style="background:var(--bg);border-radius:var(--radius-s);padding:12px 14px;margin:16px 0;">
+              <div style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;" id="teamProfMonthCap"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                  <div style="font-size:10px;color:var(--t3);">Stunden</div>
+                  <div style="font-size:18px;font-weight:800;" id="teamProfHours"></div>
+                </div>
+                <div>
+                  <div style="font-size:10px;color:var(--t3);">Geschätzter Lohn</div>
+                  <div style="font-size:18px;font-weight:800;color:var(--green);" id="teamProfLohn"></div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Letzte Einträge</div>
+            <div id="teamProfEntries" class="team-prof-entries"></div>
+            <div class="team-prof-actions">
+              <button type="button" class="btn btn-d" style="width:100%;justify-content:center;" onclick="deleteTeamEmployee()">Mitarbeiter löschen</button>
+              <p class="team-prof-del-hint">Löscht das Konto und alle Zeiteinträge dieser Person (nicht rückgängig).</p>
+            </div>
+          </div>
+        </aside>
+            </div>
+          </div>
+
+    <!-- â•â•â• LOHN â•â•â• -->
+    <div class="view" id="view-lohn">
+      <p id="lohnReadOnlyHint" class="lohn-readonly-hint hidden">Sie sehen Ihre Lohnübersicht nur zur Ansicht. Monat wechseln und als PDF drucken ist möglich; Lohn-Parameter bearbeitet die Geschäftsführung.</p>
+      <div class="lohn-toolbar">
+        <span id="lohnEmpSelWrap" class="lohn-admin-only">
+          <select id="lEmpSel" onchange="renderLohn()" style="width:220px;"></select>
+        </span>
+        <select id="lMonSel" onchange="renderLohn()"></select>
+        <div style="flex:1;"></div>
+        <button type="button" class="btn btn-g" onclick="exportLohnPdf()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          PDF exportieren
+        </button>
+      </div>
+      <div class="card payroll-rules-card" style="padding:20px 22px;margin-bottom:20px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px;">
+          <div>
+            <div class="card-title" style="margin-bottom:6px;">Lohn-Parameter</div>
+            <p style="font-size:12px;color:var(--t3);line-height:1.45;max-width:720px;">Spesen- und Abzugsregeln fÃ¼r diese Vorschau (im Browser gespeichert). Der Stundenlohn pro Person stammt aus den Mitarbeiterstammdaten (<code>hourlyRate</code> per API/Personal anlegen). Prozent-AbzÃ¼ge beziehen sich aufs Brutto (Basislohn + Spesen).</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-g" onclick="payrollAddDeduction()">Abzugszeile</button>
+            <button type="button" class="btn btn-g" onclick="payrollReset()">Standard</button>
+          </div>
+        </div>
+        <div class="form-row" style="margin-bottom:14px;max-width:280px;">
+          <div class="fg">
+            <label>Spesen pro Zeiteintrag (CHF)</label>
+            <input type="number" id="paySpesen" min="0" step="0.5" value="15" oninput="persistPayrollFromForm()">
+          </div>
+        </div>
+        <div id="payrollDeductionRows" class="payroll-deduction-rows"></div>
+      </div>
+      <div class="grid2">
+        <div class="card" style="padding:26px;">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+            <div class="emp-av" id="lAv"></div>
+            <div>
+              <div style="font-size:18px;font-weight:800;" id="lName"></div>
+              <div style="font-size:12px;color:var(--t3);font-family:'JetBrains Mono';" id="lRole"></div>
+              <div style="font-size:13px;color:var(--t2);margin-top:6px;font-weight:600;" id="lPeriodLabel"></div>
+            </div>
+          </div>
+          <hr class="div">
+          <div id="lBreakdown"></div>
+          <hr class="div">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">TOTAL BRUTTO</span>
+            <span style="font-size:26px;font-weight:800;color:var(--green);" id="lTotal"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);">
+            <span style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">Auszahlung (Netto)</span>
+            <span style="font-size:22px;font-weight:800;color:var(--t1);" id="lNetto">CHF 0.00</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Stundennachweis</div></div>
+          <table>
+            <thead><tr><th>Woche</th><th>Soll</th><th>Ist</th><th>Diff</th></tr></thead>
+            <tbody id="lWks"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- â•â•â• ALLE â•â•â• -->
+    <div class="view" id="view-alle">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;">
+        <select id="aEmpF" onchange="renderAlle()" style="width:180px;"><option value="">Alle Mitarbeiter</option></select>
+        <input type="date" id="aFrom" value="2026-03-01" onchange="renderAlle()" style="width:150px;">
+        <input type="date" id="aTo"   value="2026-03-28" onchange="renderAlle()" style="width:150px;">
+        <div style="flex:1;"></div>
+        <button class="btn btn-p" onclick="openAdd()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Eintrag hinzufÃ¼gen
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">ZeiteintrÃ¤ge</div>
+          <span class="badge bo" id="aCount">0</span>
+        </div>
+        <table>
+          <thead><tr><th>Mitarbeiter</th><th>Datum</th><th>Von</th><th>Bis</th><th>Pause</th><th>Netto</th><th>Notiz</th><th></th></tr></thead>
+          <tbody id="aBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<!-- MODAL: EINTRAG -->
+<div class="mo" id="moEntry">
+  <div class="mo-box">
+    <div class="mo-title" id="mEntryTitle">Stunden erfassen</div>
+    <div class="mo-sub" id="mEntrySub">Du kannst EintrÃ¤ge fÃ¼r jeden beliebigen Tag hinzufÃ¼gen â€” auch nachtrÃ¤glich.</div>
+    <div class="form-row" style="margin-bottom:14px;" id="eEmpRow">
+      <div class="fg" id="eEmpFg"><label>Mitarbeiter</label><select id="eEmp"></select></div>
+      <div class="fg" id="eDateFg"><label>Datum</label><input type="date" id="eDate"></div>
+    </div>
+    <div class="form-row3" style="margin-bottom:14px;">
+      <div class="fg"><label>Von</label><input type="time" id="eFrom" value="07:00"></div>
+      <div class="fg"><label>Bis</label><input type="time" id="eTo"   value="16:30"></div>
+      <div class="fg"><label>Pause (Min.)</label><input type="number" id="eBrk" value="30" min="0" max="120"></div>
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Projekt / Notiz (optional)</label>
+      <input type="text" id="eNote" placeholder="z.B. Baustelle Hinwil â€“ Heizungsanlage">
+    </div>
+    <div style="background:rgba(18,184,225,.06);border:1px solid rgba(18,184,225,.14);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:16px;">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">Nettoarbeitszeit</div>
+        <div style="font-size:24px;font-weight:800;color:var(--saniga-red);margin-top:2px;" id="eCalc">â€”</div>
+      </div>
+      <div style="width:1px;height:40px;background:var(--border);"></div>
+      <div style="font-size:12px;color:var(--t2);">Brutto â€“ Pause = Nettozeit.<br>Diese wird fÃ¼r den Lohn berechnet.</div>
+    </div>
+    <div class="mo-actions">
+      <button class="btn btn-d" id="eDel" onclick="deleteEntry()" style="margin-right:auto;display:none;">LÃ¶schen</button>
+      <button class="btn btn-g" onclick="closeM('moEntry')">Abbrechen</button>
+      <button class="btn btn-p" onclick="saveEntry()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MITARBEITER -->
+<div class="mo" id="moEmp">
+  <div class="mo-box">
+    <div class="mo-title">Mitarbeiter hinzufÃ¼gen</div>
+    <div class="mo-sub">Neuer Mitarbeiter im Saniga-Team.</div>
+    <div class="form-row" style="margin-bottom:14px;">
+      <div class="fg"><label>E-Mail (Login)</label><input type="email" id="eEmail" placeholder="mitarbeiter@firma.ch" autocomplete="off"></div>
+      <div class="fg"><label>Passwort</label><input type="password" id="ePass" placeholder="mind. 8 Zeichen" autocomplete="new-password"></div>
+    </div>
+    <div class="form-row" style="margin-bottom:14px;">
+      <div class="fg"><label>Vorname</label><input type="text" id="eFirst" placeholder="Marco"></div>
+      <div class="fg"><label>Nachname</label><input type="text"  id="eLast"  placeholder="Huber"></div>
+    </div>
+    <div class="form-row" style="margin-bottom:14px;">
+      <div class="fg"><label>Funktion</label>
+        <select id="eRole">
+          <option>Monteur SanitÃ¤r</option><option>Monteur Heizung</option>
+          <option>Monteur LÃ¼ftung</option><option>Lehrling</option>
+        </select>
+      </div>
+      <div class="fg"><label>Stundenlohn (CHF)</label><input type="number" id="eRate" value="35"></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Soll-Stunden/Woche</label><input type="number" id="eTarget" value="45"></div>
+      <div class="fg"><label>Eintrittsdatum</label><input type="date" id="eStart" value="2026-03-28"></div>
+    </div>
+    <div class="mo-actions">
+      <button class="btn btn-g" onclick="closeM('moEmp')">Abbrechen</button>
+      <button class="btn btn-p" onclick="addEmp()">HinzufÃ¼gen</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toastMsg"></span>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
