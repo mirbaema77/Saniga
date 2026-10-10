@@ -1,10 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 36" fill="none" aria-hidden="true">
-  <defs>
-    <linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#12B8E1"/>
-      <stop offset="100%" stop-color="#00A3D5"/>
-    </linearGradient>
-  </defs>
-  <text x="0" y="26" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="23" font-weight="800" fill="url(#lg)" letter-spacing="-0.02em">SANIGA AG</text>
-  <path d="M88 7a5 5 0 0 0 10 0" stroke="url(#lg)" stroke-width="2" fill="none" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 40" fill="none" aria-hidden="true">
+  <!-- Arch over N–I -->
+  <path
+    d="M70 11c0-6.5 8.2-10.5 16.5-10.5S103 4.5 103 11"
+    stroke="#12B8E1"
+    stroke-width="4.2"
+    stroke-linecap="round"
+    fill="none"
+  />
+  <text
+    x="0"
+    y="32"
+    font-family="Arial, Helvetica, 'Segoe UI', sans-serif"
+    font-size="26"
+    font-weight="800"
+    fill="#12B8E1"
+    letter-spacing="0.04em"
+  >SANIGA AG</text>
 </svg>

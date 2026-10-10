@@ -305,29 +305,22 @@ function kw(s) {
   return IsoWeek.getISOWeekPartsFromYmd(ymd).week;
 }
 
+/** Sidebar always shows the logged-in account (admin stays admin even when viewing an employee). */
 function syncSidebarFromCur() {
-  const e = ge(curUser);
+  if (!ME) return;
   const av = document.getElementById('sAv');
   const name = document.getElementById('sName');
   const role = document.getElementById('sRole');
-  if (e) {
-    av.textContent = ini(e);
-    av.style.background = e.color;
-    name.textContent = `${e.first} ${e.last}`;
-    role.textContent = e.role;
-  } else {
-    av.textContent = (ME.firstName[0] + ME.lastName[0]).toUpperCase();
-    av.style.background = ME.avatarColor || '#12B8E1';
-    name.textContent = `${ME.firstName} ${ME.lastName}`;
-    role.textContent = ME.jobTitle || 'Admin';
-  }
+  av.textContent = (ME.firstName[0] + ME.lastName[0]).toUpperCase();
+  av.style.background = ME.avatarColor || '#12B8E1';
+  name.textContent = `${ME.firstName} ${ME.lastName}`;
+  role.textContent = ME.jobTitle || (ME.role === 'ADMIN' ? 'Admin' : 'Mitarbeiter');
 }
 
 function switchUser(id) {
   curUser = id;
   const s = document.getElementById('userSwitcher');
   if (s && EMPS.some((e) => e.id === id)) s.value = id;
-  syncSidebarFromCur();
   refreshCur();
 }
 

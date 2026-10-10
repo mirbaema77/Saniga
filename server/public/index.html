@@ -64,12 +64,12 @@ body {
   background: linear-gradient(180deg, rgba(18,184,225,.35) 0%, transparent 55%);
 }
 .sidebar-logo {
-  padding: 24px 20px 20px;
+  padding: 22px 18px 18px;
   border-bottom: 1px solid rgba(255,255,255,.06);
-  display:flex; flex-direction:column; align-items:flex-start; gap:10px;
+  display:flex; flex-direction:column; align-items:flex-start; gap:8px;
 }
 .logo-img {
-  height: 28px;
+  height: 34px;
   width: auto;
   max-width: 100%;
   display: block;
@@ -105,14 +105,43 @@ body {
 /* ── MAIN ── */
 .main { flex:1;display:flex;flex-direction:column;min-width:0; }
 .topbar {
-  height:60px;background:var(--glass-b);backdrop-filter:blur(20px);
+  height:64px;background:#f5f8fa;backdrop-filter:blur(20px);
   border-bottom:1px solid var(--border);
-  display:flex;align-items:center;padding:0 28px;gap:14px;
+  display:flex;align-items:center;padding:0 24px;gap:10px;
   position:sticky;top:0;z-index:10;
 }
-.topbar-title { font-size:18px;font-weight:700;flex:1;color:var(--t1); }
-.topbar-date { font-family:'JetBrains Mono';font-size:11px;color:var(--t3);background:var(--bg);border:1px solid var(--border);padding:4px 10px;border-radius:6px; }
-#userSwitcher { background:var(--bg);border:1px solid var(--border-med);color:var(--t2);padding:6px 10px;border-radius:8px;font-size:12px;font-family:'JetBrains Mono';cursor:pointer; }
+.topbar-title { font-size:17px;font-weight:700;flex:1;color:var(--t1); min-width:0; }
+.topbar-actions { display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end; }
+.topbar-chip {
+  display:inline-flex;align-items:center;justify-content:center;
+  background:#eef4f7;border:1px solid rgba(22,48,58,0.10);
+  color:var(--t2);border-radius:12px;padding:9px 14px;
+  font-size:13px;font-weight:500;font-family:'Plus Jakarta Sans',sans-serif;
+  line-height:1.2;white-space:nowrap;box-shadow:none;
+}
+.topbar-date {
+  font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;
+  color:#7a9099;background:#eef4f7;border:1px solid rgba(22,48,58,0.10);
+  padding:9px 14px;border-radius:12px;
+}
+.topbar-btn {
+  display:inline-flex;align-items:center;justify-content:center;
+  background:#eef4f7;border:1px solid rgba(22,48,58,0.10);
+  color:#2a4a55;border-radius:12px;padding:9px 14px;
+  font-size:13px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;
+  cursor:pointer;text-decoration:none;line-height:1.2;white-space:nowrap;
+  transition:background .15s,border-color .15s,color .15s;
+}
+.topbar-btn:hover { background:#e4eef3;border-color:rgba(22,48,58,0.16);color:var(--t1); }
+#userSwitcher {
+  appearance:none;-webkit-appearance:none;
+  background:#eef4f7 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%234a6570' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+  border:1px solid rgba(22,48,58,0.10);color:#2a4a55;
+  padding:9px 34px 9px 14px;border-radius:12px;
+  font-size:13px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;
+  cursor:pointer;min-width:180px;
+}
+#userSwitcher:hover { background-color:#e4eef3;border-color:rgba(22,48,58,0.16); }
 .content { flex:1;padding:28px;overflow-y:auto; }
 
 /* ── VIEWS ── */
@@ -379,7 +408,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <img src="/assets/logo-saniga.svg" alt="SANIGA AG" class="logo-img" width="172" height="31" decoding="async"/>
+    <img src="/assets/logo-saniga.svg" alt="SANIGA AG" class="logo-img" width="190" height="36" decoding="async"/>
     <div class="logo-sub">Zeiterfassung</div>
   </div>
   <nav class="nav">
@@ -433,12 +462,14 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 <main class="main">
   <div class="topbar">
     <div class="topbar-title" id="topTitle">Meine Zeiten</div>
-    <div class="topbar-date" id="topDate"></div>
-    <a href="/join.html" id="inviteLink" class="btn btn-g admin-only-nav hidden" style="text-decoration:none;">Link für Mitarbeitende</a>
-    <span id="userSwitchWrap" class="admin-only-nav hidden">
-      <select id="userSwitcher" onchange="switchUser(this.value)"></select>
-    </span>
-    <button type="button" class="btn btn-g" id="logoutBtn">Abmelden</button>
+    <div class="topbar-actions">
+      <div class="topbar-date" id="topDate"></div>
+      <a href="/join.html" id="inviteLink" class="topbar-btn admin-only-nav hidden">Link für Mitarbeitende</a>
+      <span id="userSwitchWrap" class="admin-only-nav hidden">
+        <select id="userSwitcher" onchange="switchUser(this.value)" aria-label="Mitarbeiter wählen"></select>
+      </span>
+      <button type="button" class="topbar-btn" id="logoutBtn">Abmelden</button>
+    </div>
   </div>
   <div class="content">
 
