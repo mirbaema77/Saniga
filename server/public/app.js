@@ -13,6 +13,10 @@ let teamSelEmpId = null;
 let sdTab = 'kunden';
 let reportYear = null;
 let reportWeek = null;
+let entrySyncTimer = null;
+let entriesFingerprint = '';
+let suppressRemoteToastUntil = 0;
+let syncInFlight = false;
 
 const MOS = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
@@ -73,6 +77,95 @@ function mapEntry(e) {
   };
 }
 
+function fingerprintEntries(list) {
+  return list
+    .map((e) =>
+      [e.id, e.empId, e.date, e.from, e.to, e.brk, e.hours, e.siteId, e.workTypeId, e.note].join(':')
+    )
+    .sort()
+    .join('|');
+}
+
+function markLocalEntriesState() {
+  entriesFingerprint = fingerprintEntries(ENTRIES);
+  suppressRemoteToastUntil = Date.now() + 8000;
+}
+
+function notifyEntrySync(prev, next) {
+  const prevIds = new Set(prev.map((e) => e.id));
+  const nextIds = new Set(next.map((e) => e.id));
+  const added = next.filter((e) => !prevIds.has(e.id));
+  const removed = prev.filter((e) => !nextIds.has(e.id));
+  const changed = next.filter((e) => {
+    const old = prev.find((p) => p.id === e.id);
+    return old && fingerprintEntries([old]) !== fingerprintEntries([e]);
+  });
+  if (!added.length && !removed.length && !changed.length) return;
+
+  if (IS_ADMIN) {
+    if (added.length === 1) toast('Neuer Zeiteintrag vom Team');
+    else if (added.length > 1) toast(`${added.length} neue Zeiteinträge vom Team`);
+    else if (changed.length) toast('Zeiteinträge vom Team aktualisiert');
+    else toast('Zeiteintrag vom Team entfernt');
+  } else if (added.length === 1) {
+    toast('Geschäftsführung hat einen Zeiteintrag hinzugefügt');
+  } else if (added.length > 1) {
+    toast(`Geschäftsführung hat ${added.length} Zeiteinträge hinzugefügt`);
+  } else if (changed.length) {
+    toast('Geschäftsführung hat einen Zeiteintrag geändert');
+  } else {
+    toast('Geschäftsführung hat einen Zeiteintrag entfernt');
+  }
+}
+
+async function pollRemoteEntries() {
+  if (!ME || syncInFlight) return;
+  if (document.querySelector('.mo.open')) return;
+  syncInFlight = true;
+  try {
+    const entRes = await api('/time-entries?from=2020-01-01&to=2030-12-31');
+    const next = entRes.entries.map(mapEntry);
+    const fp = fingerprintEntries(next);
+    if (fp === entriesFingerprint) return;
+
+    const prev = ENTRIES.slice();
+    const hadState = Boolean(entriesFingerprint);
+    ENTRIES = next;
+
+    if (IS_ADMIN) {
+      try {
+        const emRes = await api('/employees');
+        EMPS = emRes.employees.map(mapEmp);
+        fillUserSwitcher();
+      } catch {
+        /* keep existing EMPS */
+      }
+    }
+
+    const allowToast = hadState && Date.now() >= suppressRemoteToastUntil;
+    entriesFingerprint = fp;
+    if (allowToast) notifyEntrySync(prev, next);
+    refreshCur();
+  } catch {
+    /* ignore transient network errors */
+  } finally {
+    syncInFlight = false;
+  }
+}
+
+function startEntrySync() {
+  stopEntrySync();
+  markLocalEntriesState();
+  entrySyncTimer = setInterval(pollRemoteEntries, 4000);
+}
+
+function stopEntrySync() {
+  if (entrySyncTimer) {
+    clearInterval(entrySyncTimer);
+    entrySyncTimer = null;
+  }
+}
+
 async function loadData() {
   const entRes = await api('/time-entries?from=2020-01-01&to=2030-12-31');
   ENTRIES = entRes.entries.map(mapEntry);
@@ -90,6 +183,7 @@ async function loadData() {
     /* dropdowns filled when opening the form */
   }
   fillUserSwitcher();
+  markLocalEntriesState();
 }
 
 function formatEmpSelectLabel(e) {
@@ -267,6 +361,7 @@ function showView(n) {
   });
   document.getElementById('topTitle').textContent = TITLES[n] || '';
   refreshView(n);
+  if (ME) pollRemoteEntries();
 }
 
 function refreshCur() {
@@ -1495,7 +1590,7 @@ function toast(msg) {
   const t = document.getElementById('toast');
   document.getElementById('toastMsg').textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2600);
+  setTimeout(() => t.classList.remove('show'), 3600);
 }
 
 function initAfterLogin() {
@@ -1518,7 +1613,14 @@ function initAfterLogin() {
   syncSidebarFromCur();
   tick();
   showView('meine');
+  startEntrySync();
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && ME) {
+    pollRemoteEntries();
+  }
+});
 
 async function doLogin() {
   const err = document.getElementById('loginErr');
@@ -1564,6 +1666,7 @@ async function trySession() {
 
 document.getElementById('loginBtn').addEventListener('click', doLogin);
 document.getElementById('logoutBtn').addEventListener('click', () => {
+  stopEntrySync();
   localStorage.removeItem(TOKEN_KEY);
   window.location.reload();
 });
