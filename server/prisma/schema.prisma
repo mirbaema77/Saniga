@@ -44,3 +44,28 @@ model TimeEntry {
 
   @@index([userId, date])
 }
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  sites     Site[]
+  createdAt DateTime @default(now())
+}
+
+model Site {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  label      String
+  address    String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+model WorkType {
+  id       String  @id @default(cuid())
+  label    String
+  billable Boolean @default(true)
+  active   Boolean @default(true)
+}
