@@ -8,8 +8,10 @@ const {
   DEFAULT_VAT_RATE,
   buildLineItems,
   totalsFromLines,
+  buildInvoiceView,
 } = require('../lib/invoiceMath');
 const { renderInvoicePdf } = require('../lib/invoicePdf');
+const { renderInvoiceDocx } = require('../lib/invoiceDocx');
 
 const router = express.Router();
 
@@ -18,6 +20,11 @@ const createSchema = z.object({
   year: z.coerce.number().int().min(2000).max(2100),
   week: z.coerce.number().int().min(1).max(53),
 });
+
+const invoiceEntryInclude = {
+  user: { select: { id: true, firstName: true, lastName: true } },
+  workType: { select: { id: true, label: true } },
+};
 
 function ymdToUtcDate(ymd, endOfDay = false) {
   const [y, m, d] = ymd.split('-').map(Number);
@@ -64,7 +71,55 @@ function toInvoiceDto(invoice, lineItems) {
   };
 }
 
+async function loadInvoice(id) {
+  return prisma.invoice.findUnique({
+    where: { id },
+    include: {
+      customer: true,
+      site: true,
+      entries: {
+        include: invoiceEntryInclude,
+        orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
+      },
+    },
+  });
+}
+
+function safeFileName(number) {
+  return String(number).replace(/[^\w.-]+/g, '_');
+}
+
 router.use(requireAuth, requireAdmin);
+
+router.get('/', async (_req, res) => {
+  const rows = await prisma.invoice.findMany({
+    include: {
+      customer: { select: { id: true, name: true } },
+      site: { select: { id: true, label: true } },
+      entries: { include: invoiceEntryInclude },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const invoices = rows.map((inv) => {
+    const view = buildInvoiceView(inv);
+    return {
+      id: inv.id,
+      number: inv.number,
+      customer: inv.customer,
+      site: inv.site,
+      periodFrom: inv.periodFrom,
+      periodTo: inv.periodTo,
+      issueDate: inv.issueDate,
+      createdAt: inv.createdAt,
+      total: view.total,
+      subtotal: view.subtotal,
+      vat: view.vat,
+    };
+  });
+
+  res.json({ invoices });
+});
 
 router.post('/', async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
@@ -89,10 +144,7 @@ router.post('/', async (req, res) => {
       hours: { not: null },
       date: { gte: from, lte: to },
     },
-    include: {
-      user: { select: { id: true, firstName: true, lastName: true } },
-      workType: { select: { id: true, label: true } },
-    },
+    include: invoiceEntryInclude,
     orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
   });
 
@@ -135,33 +187,41 @@ router.post('/', async (req, res) => {
 });
 
 router.get('/:id/pdf', async (req, res) => {
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: req.params.id },
-    include: {
-      customer: true,
-      site: true,
-      entries: {
-        include: {
-          user: { select: { id: true, firstName: true, lastName: true } },
-          workType: { select: { id: true, label: true } },
-        },
-        orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
-      },
-    },
-  });
+  const invoice = await loadInvoice(req.params.id);
   if (!invoice) {
     return res.status(404).json({ error: 'Rechnung nicht gefunden' });
   }
 
   try {
     const pdf = await renderInvoicePdf(invoice);
-    const safeName = String(invoice.number).replace(/[^\w.-]+/g, '_');
+    const safeName = safeFileName(invoice.number);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="Rechnung-${safeName}.pdf"`);
     res.send(pdf);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'PDF konnte nicht erzeugt werden' });
+  }
+});
+
+router.get('/:id/docx', async (req, res) => {
+  const invoice = await loadInvoice(req.params.id);
+  if (!invoice) {
+    return res.status(404).json({ error: 'Rechnung nicht gefunden' });
+  }
+
+  try {
+    const docx = await renderInvoiceDocx(invoice);
+    const safeName = safeFileName(invoice.number);
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="Rechnung-${safeName}.docx"`);
+    res.send(docx);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Word-Datei konnte nicht erzeugt werden' });
   }
 });
 

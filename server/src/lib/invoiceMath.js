@@ -85,6 +85,54 @@ function totalsFromLines(lines, vatRate) {
   return { subtotal, vat, total };
 }
 
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+/** Civil DD.MM.YYYY in Europe/Zurich (issue date) or UTC calendar for stored period bounds. */
+function formatDeDate(d, { utc = false } = {}) {
+  const dt = d instanceof Date ? d : new Date(d);
+  if (utc) {
+    return `${pad2(dt.getUTCDate())}.${pad2(dt.getUTCMonth() + 1)}.${dt.getUTCFullYear()}`;
+  }
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Zurich',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).formatToParts(dt);
+  const day = parts.find((p) => p.type === 'day')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value;
+  const year = parts.find((p) => p.type === 'year')?.value;
+  return `${day}.${month}.${year}`;
+}
+
+function formatVatRate(rate) {
+  const n = Number(rate);
+  return Number.isInteger(n) ? String(n) : String(n);
+}
+
+/** Shared presentation model for PDF and Word renderers. */
+function buildInvoiceView(invoice) {
+  const lineItems = buildLineItems(invoice.entries || []);
+  const vatRate = Number(invoice.vatRate);
+  const totals = totalsFromLines(lineItems, vatRate);
+  return {
+    number: invoice.number,
+    customerName: invoice.customer?.name || '',
+    customerAddress: invoice.customer?.address || '',
+    siteLabel: invoice.site?.label || '',
+    issueDateLabel: formatDeDate(invoice.issueDate),
+    periodFromLabel: formatDeDate(invoice.periodFrom, { utc: true }),
+    periodToLabel: formatDeDate(invoice.periodTo, { utc: true }),
+    vatRate,
+    vatRateLabel: formatVatRate(vatRate),
+    hourlyRate: HOURLY_RATE_CHF,
+    lineItems,
+    ...totals,
+  };
+}
+
 module.exports = {
   HOURLY_RATE_CHF,
   DEFAULT_VAT_RATE,
@@ -94,4 +142,7 @@ module.exports = {
   formatHoursQty,
   buildLineItems,
   totalsFromLines,
+  formatDeDate,
+  formatVatRate,
+  buildInvoiceView,
 };

@@ -4,8 +4,13 @@ const { toPublicUser } = require('../lib/userDto');
 
 function getBearer(req) {
   const h = req.headers.authorization;
-  if (!h || !h.startsWith('Bearer ')) return null;
-  return h.slice(7).trim() || null;
+  if (h && h.startsWith('Bearer ')) {
+    const fromHeader = h.slice(7).trim();
+    if (fromHeader) return fromHeader;
+  }
+  // Allow token query for <a href> file downloads (PDF/Word) that cannot set Authorization.
+  const q = req.query && typeof req.query.token === 'string' ? req.query.token.trim() : '';
+  return q || null;
 }
 
 async function requireAuth(req, res, next) {

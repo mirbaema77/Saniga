@@ -13,6 +13,7 @@ let teamSelEmpId = null;
 let sdTab = 'kunden';
 let reportYear = null;
 let reportWeek = null;
+let reportInvoiceFlash = null;
 let entrySyncTimer = null;
 let entriesFingerprint = '';
 let suppressRemoteToastUntil = 0;
@@ -354,6 +355,7 @@ const TITLES = {
   lohn: 'Lohnabrechnung',
   alle: 'Alle Einträge',
   rapporte: 'Rapporte',
+  rechnungen: 'Rechnungen',
 };
 
 function showView(n) {
@@ -395,6 +397,9 @@ function refreshView(n) {
   }
   if (n === 'rapporte' && IS_ADMIN) {
     loadReports();
+  }
+  if (n === 'rechnungen' && IS_ADMIN) {
+    loadInvoices();
   }
 }
 
@@ -446,6 +451,56 @@ async function loadReports() {
   }
 }
 
+function authTokenQuery() {
+  const t = localStorage.getItem(TOKEN_KEY) || '';
+  return `token=${encodeURIComponent(t)}`;
+}
+
+function invoiceFileHref(invoiceId, kind) {
+  return `/api/invoices/${encodeURIComponent(invoiceId)}/${kind}?${authTokenQuery()}`;
+}
+
+function invoiceDownloadLinksHtml(invoiceId) {
+  return `<a class="btn btn-g" href="${escapeAttr(invoiceFileHref(invoiceId, 'pdf'))}" target="_blank" rel="noopener">PDF</a>
+    <a class="btn btn-g" href="${escapeAttr(invoiceFileHref(invoiceId, 'docx'))}" target="_blank" rel="noopener">Word</a>`;
+}
+
+function invoiceResultRowHtml(invoice, { created = false } = {}) {
+  const label = created
+    ? `Rechnung ${escapeAttr(invoice.number)} erstellt`
+    : `Rechnung ${escapeAttr(invoice.number)}`;
+  return `<div class="rp-inv-result" data-invoice-id="${escapeAttr(invoice.id)}">
+    <span class="rp-inv-result-label">${label}</span>
+    ${invoiceDownloadLinksHtml(invoice.id)}
+  </div>`;
+}
+
+function siteInvoicesFromEntries(entries) {
+  const map = new Map();
+  for (const en of entries || []) {
+    if (en.invoiceId && en.invoiceNumber && !map.has(en.invoiceId)) {
+      map.set(en.invoiceId, { id: en.invoiceId, number: en.invoiceNumber });
+    }
+  }
+  return [...map.values()];
+}
+
+function formatSwissChf(n) {
+  const fixed = (Math.round(Number(n) * 100) / 100).toFixed(2);
+  const [intPart, dec] = fixed.split('.');
+  return `${intPart.replace(/\B(?=(\d{3})+(?!\d))/g, "'")}.${dec}`;
+}
+
+function formatInvoicePeriod(from, to) {
+  const fmt = (d) => {
+    const dt = d instanceof Date ? d : new Date(d);
+    const dd = String(dt.getUTCDate()).padStart(2, '0');
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    return `${dd}.${mm}.${dt.getUTCFullYear()}`;
+  };
+  return `${fmt(from)} – ${fmt(to)}`;
+}
+
 function renderReports(data) {
   const body = document.getElementById('rpBody');
   if (!body) return;
@@ -454,15 +509,15 @@ function renderReports(data) {
     body.innerHTML = `<div class="card rp-empty">Keine Einträge mit Objekt in dieser Woche.</div>`;
     return;
   }
+  const flash = reportInvoiceFlash;
+  reportInvoiceFlash = null;
   body.innerHTML = customers
     .map((c) => {
       const sitesHtml = (c.sites || [])
         .map((s) => {
           const entries = s.entries || [];
           const allInvoiced = entries.length > 0 && entries.every((en) => en.invoiceId || en.invoiceNumber);
-          const invoiceNumbers = [
-            ...new Set(entries.map((en) => en.invoiceNumber).filter(Boolean)),
-          ];
+          const siteInvoices = siteInvoicesFromEntries(entries);
           const rows = entries
             .map((en) => {
               const invoiced = !!(en.invoiceId || en.invoiceNumber);
@@ -478,22 +533,26 @@ function renderReports(data) {
             </tr>`;
             })
             .join('');
-          const invStatus = invoiceNumbers.length
-            ? `<span class="rp-inv-status" data-rp-inv-status>${invoiceNumbers.map((n) => escapeAttr(n)).join(', ')}</span>`
-            : `<span class="rp-inv-status" data-rp-inv-status></span>`;
           const createBtn = allInvoiced
             ? ''
             : `<button type="button" class="btn btn-g" data-rp-create-inv onclick="createReportInvoice('${escapeAttr(s.id)}')">Rechnung erstellen</button>`;
+          const resultRows = siteInvoices
+            .map((inv) =>
+              invoiceResultRowHtml(inv, {
+                created: !!(flash && flash.siteId === s.id && flash.invoiceId === inv.id),
+              })
+            )
+            .join('');
           return `<div class="rp-site" data-site-id="${escapeAttr(s.id)}">
             <div class="rp-site-head">
               <div class="rp-site-label">${escapeAttr(s.label)}</div>
               <div class="rp-site-total">${escapeAttr(formatReportHours(s.totalHours))} Total</div>
               <div class="rp-site-actions">
-                ${invStatus}
                 ${createBtn}
                 <span class="rp-inv-msg" data-rp-inv-msg></span>
               </div>
             </div>
+            <div data-rp-inv-results>${resultRows}</div>
             <table>
               <thead><tr><th>Datum</th><th>Mitarbeiter</th><th>Arbeit</th><th>Stunden</th><th>Bemerkung</th></tr></thead>
               <tbody>${rows}</tbody>
@@ -523,26 +582,6 @@ function setReportInvoiceMessage(siteId, msg, isErr) {
   if (!el) return;
   el.textContent = msg || '';
   el.classList.toggle('err', !!isErr);
-}
-
-async function openInvoicePdf(invoiceId) {
-  const t = localStorage.getItem(TOKEN_KEY);
-  const r = await fetch(`/api/invoices/${invoiceId}/pdf`, {
-    headers: t ? { Authorization: `Bearer ${t}` } : {},
-  });
-  if (!r.ok) {
-    let msg = 'PDF konnte nicht geladen werden';
-    try {
-      const data = await r.json();
-      if (data.error) msg = data.error;
-    } catch {
-      /* keep default */
-    }
-    throw new Error(msg);
-  }
-  const blob = await r.blob();
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank', 'noopener');
 }
 
 async function createReportInvoice(siteId) {
@@ -577,20 +616,59 @@ async function createReportInvoice(siteId) {
       throw new Error(data.error || `HTTP ${r.status}`);
     }
     const invoice = data.invoice;
-    if (invoice?.number) {
-      const status = block?.querySelector('[data-rp-inv-status]');
-      if (status) status.textContent = invoice.number;
-      setReportInvoiceMessage(siteId, `Rechnung ${invoice.number}`, false);
-    }
-    if (invoice?.id) {
-      await openInvoicePdf(invoice.id);
+    if (invoice?.id && invoice?.number) {
+      reportInvoiceFlash = { siteId, invoiceId: invoice.id, number: invoice.number };
+      const results = block?.querySelector('[data-rp-inv-results]');
+      if (results) {
+        results.insertAdjacentHTML('afterbegin', invoiceResultRowHtml(invoice, { created: true }));
+      }
+      if (btn) btn.remove();
     }
     await loadReports();
   } catch (e) {
     setReportInvoiceMessage(siteId, e.message || 'Rechnung fehlgeschlagen', true);
   } finally {
-    if (btn) btn.disabled = false;
+    if (btn && btn.isConnected) btn.disabled = false;
   }
+}
+
+async function loadInvoices() {
+  if (!IS_ADMIN) return;
+  const body = document.getElementById('invBody');
+  if (!body) return;
+  body.innerHTML = `<div class="card rp-empty">Lade Rechnungen…</div>`;
+  try {
+    const data = await api('/invoices');
+    renderInvoices(data.invoices || []);
+  } catch (e) {
+    body.innerHTML = `<div class="card rp-empty" style="color:var(--red);">${escapeAttr(e.message)}</div>`;
+  }
+}
+
+function renderInvoices(invoices) {
+  const body = document.getElementById('invBody');
+  if (!body) return;
+  if (!invoices.length) {
+    body.innerHTML = `<div class="card rp-empty">Noch keine Rechnungen erstellt.</div>`;
+    return;
+  }
+  body.innerHTML = `<div class="card" style="padding:18px 20px;"><div class="inv-list">${invoices
+    .map((inv) => {
+      const customer = inv.customer?.name || '—';
+      const site = inv.site?.label || '—';
+      const period = formatInvoicePeriod(inv.periodFrom, inv.periodTo);
+      return `<div class="inv-row">
+        <div class="inv-row-main">
+          <div class="inv-row-num">${escapeAttr(inv.number)}</div>
+          <div class="inv-row-meta">${escapeAttr(customer)} · ${escapeAttr(site)} · ${escapeAttr(period)}</div>
+        </div>
+        <div class="inv-row-total">CHF ${escapeAttr(formatSwissChf(inv.total))}</div>
+        <div class="inv-row-actions">
+          ${invoiceDownloadLinksHtml(inv.id)}
+        </div>
+      </div>`;
+    })
+    .join('')}</div></div>`;
 }
 
 function showSdErr(id, msg) {
