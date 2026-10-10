@@ -4,9 +4,15 @@ let ME = null;
 let IS_ADMIN = false;
 let EMPS = [];
 let ENTRIES = [];
+let CUSTOMERS = [];
+let SITES = [];
+let WORK_TYPES = [];
 let editId = null;
 let curUser = '';
 let teamSelEmpId = null;
+let sdTab = 'kunden';
+let reportYear = null;
+let reportWeek = null;
 
 const MOS = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
@@ -61,6 +67,9 @@ function mapEntry(e) {
     to: e.toMinutes,
     brk: e.breakMinutes,
     note: e.note || '',
+    siteId: e.siteId || null,
+    workTypeId: e.workTypeId || null,
+    hours: e.hours == null ? null : Number(e.hours),
   };
 }
 
@@ -72,6 +81,13 @@ async function loadData() {
     EMPS = emRes.employees.map(mapEmp);
   } else {
     EMPS = [mapEmp(ME)];
+  }
+  try {
+    const [sRes, wRes] = await Promise.all([api('/sites'), api('/work-types')]);
+    SITES = sRes.sites || [];
+    WORK_TYPES = wRes.workTypes || [];
+  } catch {
+    /* dropdowns filled when opening the form */
   }
   fillUserSwitcher();
 }
@@ -130,7 +146,30 @@ function ini(e) {
 }
 
 function net(en) {
+  if (en.hours != null && !Number.isNaN(Number(en.hours))) {
+    return Math.round(Number(en.hours) * 60);
+  }
   return en.to - en.from - en.brk;
+}
+
+function entrySiteLabel(en) {
+  const site = SITES.find((s) => s.id === en.siteId);
+  if (!site) return '';
+  const cust = site.customer?.name || CUSTOMERS.find((c) => c.id === site.customerId)?.name || '';
+  return cust ? `${cust} — ${site.label}` : site.label;
+}
+
+function entryWorkLabel(en) {
+  const wt = WORK_TYPES.find((w) => w.id === en.workTypeId);
+  return wt ? wt.label : '';
+}
+
+function entryTimeLabel(en) {
+  if (en.hours != null && !Number.isNaN(Number(en.hours))) {
+    const h = Number(en.hours);
+    return `${h % 1 ? h.toFixed(1) : h}h`;
+  }
+  return `${mStr(en.from)} – ${mStr(en.to)}`;
 }
 
 function mStr(m) {
@@ -210,7 +249,7 @@ function tick() {
   const n = new Date();
   const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
   const mos = MOS;
-  document.getElementById('topDate').textContent = `${days[n.getDay()]}, ${n.getDate()}. ${mos[n.getMonth()]} ${n.getFullYear()}`;
+  document.getElementById('topDate').textContent = `${days[n.getDay()]}, ${n.getDate()}. ${mos[n.getMonth() + 1]} ${n.getFullYear()}`;
 }
 setInterval(tick, 30000);
 
@@ -219,8 +258,10 @@ const TITLES = {
   monat: 'Monatsübersicht',
   dashboard: 'Admin Dashboard',
   team: 'Team verwalten',
+  stammdaten: 'Stammdaten',
   lohn: 'Lohnabrechnung',
   alle: 'Alle Einträge',
+  rapporte: 'Rapporte',
 };
 
 function showView(n) {
@@ -256,6 +297,383 @@ function refreshView(n) {
     fillAlleSel();
     renderAlle();
   }
+  if (n === 'stammdaten' && IS_ADMIN) {
+    loadStammdaten();
+  }
+  if (n === 'rapporte' && IS_ADMIN) {
+    loadReports();
+  }
+}
+
+function getISOWeekParts(date = new Date()) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  return { year: d.getUTCFullYear(), week };
+}
+
+function isoWeekBounds(year, week) {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const day = jan4.getUTCDay() || 7;
+  const mondayWeek1 = new Date(jan4);
+  mondayWeek1.setUTCDate(jan4.getUTCDate() - day + 1);
+  const monday = new Date(mondayWeek1);
+  monday.setUTCDate(mondayWeek1.getUTCDate() + (week - 1) * 7);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  const fmt = (dt) =>
+    `${String(dt.getUTCDate()).padStart(2, '0')}.${String(dt.getUTCMonth() + 1).padStart(2, '0')}.${dt.getUTCFullYear()}`;
+  return { fromLabel: fmt(monday), toLabel: fmt(sunday), monday, sunday };
+}
+
+function shiftReportWeek(delta) {
+  if (reportYear == null || reportWeek == null) {
+    const cur = getISOWeekParts(new Date());
+    reportYear = cur.year;
+    reportWeek = cur.week;
+  }
+  const { monday } = isoWeekBounds(reportYear, reportWeek);
+  monday.setUTCDate(monday.getUTCDate() + delta * 7);
+  const next = getISOWeekParts(
+    new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate())
+  );
+  reportYear = next.year;
+  reportWeek = next.week;
+  loadReports();
+}
+
+function formatReportHours(h) {
+  const n = Number(h) || 0;
+  return `${n % 1 ? n.toFixed(1) : n}h`;
+}
+
+async function loadReports() {
+  if (!IS_ADMIN) return;
+  if (reportYear == null || reportWeek == null) {
+    const cur = getISOWeekParts(new Date());
+    reportYear = cur.year;
+    reportWeek = cur.week;
+  }
+  const body = document.getElementById('rpBody');
+  const label = document.getElementById('rpWeekLabel');
+  const bounds = isoWeekBounds(reportYear, reportWeek);
+  if (label) {
+    label.textContent = `KW ${reportWeek} · ${bounds.fromLabel}–${bounds.toLabel}`;
+  }
+  if (body) {
+    body.innerHTML = `<div class="card rp-empty">Lade Rapporte…</div>`;
+  }
+  try {
+    const data = await api(`/reports?year=${reportYear}&week=${reportWeek}`);
+    reportYear = data.year;
+    reportWeek = data.week;
+    const b = isoWeekBounds(reportYear, reportWeek);
+    if (label) {
+      label.textContent = `KW ${reportWeek} · ${b.fromLabel}–${b.toLabel}`;
+    }
+    renderReports(data);
+  } catch (e) {
+    if (body) {
+      body.innerHTML = `<div class="card rp-empty" style="color:var(--red);">${escapeAttr(e.message)}</div>`;
+    }
+  }
+}
+
+function renderReports(data) {
+  const body = document.getElementById('rpBody');
+  if (!body) return;
+  const customers = data.customers || [];
+  if (!customers.length) {
+    body.innerHTML = `<div class="card rp-empty">Keine Einträge mit Objekt in dieser Woche.</div>`;
+    return;
+  }
+  body.innerHTML = customers
+    .map((c) => {
+      const sitesHtml = (c.sites || [])
+        .map((s) => {
+          const rows = (s.entries || [])
+            .map(
+              (en) => `<tr>
+              <td>${escapeAttr(fmtD(en.date))}</td>
+              <td>${escapeAttr(en.employeeName)}</td>
+              <td>${escapeAttr(en.workType)}</td>
+              <td class="mono">${escapeAttr(formatReportHours(en.hours))}</td>
+              <td style="color:var(--t2);">${escapeAttr(en.note || '—')}</td>
+            </tr>`
+            )
+            .join('');
+          return `<div class="rp-site">
+            <div class="rp-site-head">
+              <div class="rp-site-label">${escapeAttr(s.label)}</div>
+              <div class="rp-site-total">${escapeAttr(formatReportHours(s.totalHours))} Total</div>
+            </div>
+            <table>
+              <thead><tr><th>Datum</th><th>Mitarbeiter</th><th>Arbeit</th><th>Stunden</th><th>Bemerkung</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+        })
+        .join('');
+      return `<div class="card rp-customer" style="padding:20px 22px;">
+        <div class="rp-customer-head">
+          <div class="rp-customer-name">${escapeAttr(c.name)}</div>
+          <div class="rp-customer-total">${escapeAttr(formatReportHours(c.totalHours))} Total</div>
+        </div>
+        ${sitesHtml}
+      </div>`;
+    })
+    .join('');
+}
+
+function showSdErr(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.style.display = 'block';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
+  }
+}
+
+function showStammdatenTab(tab) {
+  sdTab = tab;
+  document.querySelectorAll('.sd-tab').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-sd-tab') === tab);
+  });
+  document.querySelectorAll('.sd-panel').forEach((p) => p.classList.remove('active'));
+  const panel = document.getElementById(`sd-panel-${tab}`);
+  if (panel) panel.classList.add('active');
+  if (tab === 'kunden') renderCustomers();
+  if (tab === 'objekte') {
+    fillSiteCustomerSelect();
+    renderSites();
+  }
+  if (tab === 'arbeitsarten') renderWorkTypes();
+}
+
+async function loadStammdaten() {
+  if (!IS_ADMIN) return;
+  try {
+    const [cRes, sRes, wRes] = await Promise.all([
+      api('/customers'),
+      api('/sites'),
+      api('/work-types'),
+    ]);
+    CUSTOMERS = cRes.customers || [];
+    SITES = sRes.sites || [];
+    WORK_TYPES = wRes.workTypes || [];
+    showStammdatenTab(sdTab || 'kunden');
+  } catch (e) {
+    showSdErr('sdCustErr', e.message);
+    toast(e.message);
+  }
+}
+
+function fillSiteCustomerSelect() {
+  const sel = document.getElementById('sdSiteCust');
+  if (!sel) return;
+  const prev = sel.value;
+  if (!CUSTOMERS.length) {
+    sel.innerHTML = '<option value="">Kein Kunde vorhanden</option>';
+    return;
+  }
+  sel.innerHTML = CUSTOMERS.map(
+    (c) => `<option value="${escapeAttr(c.id)}">${escapeAttr(c.name)}</option>`
+  ).join('');
+  if (prev && CUSTOMERS.some((c) => c.id === prev)) sel.value = prev;
+}
+
+function renderCustomers() {
+  const body = document.getElementById('sdCustBody');
+  const count = document.getElementById('sdCustCount');
+  if (!body) return;
+  if (count) count.textContent = String(CUSTOMERS.length);
+  if (!CUSTOMERS.length) {
+    body.innerHTML = '<tr><td colspan="3" style="color:var(--t3);">Noch keine Kunden.</td></tr>';
+    return;
+  }
+  body.innerHTML = CUSTOMERS.map((c) => {
+    const id = escapeAttr(c.id);
+    return `<tr data-id="${id}">
+      <td><input class="sd-inline-input" type="text" id="sdCustName_${id}" value="${escapeAttr(c.name || '')}" maxlength="200"></td>
+      <td><input class="sd-inline-input" type="text" id="sdCustAddr_${id}" value="${escapeAttr(c.address || '')}" maxlength="500" placeholder="—"></td>
+      <td><div class="sd-actions"><button type="button" class="btn btn-g" onclick="saveCustomer('${id}')">Speichern</button></div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function addCustomer() {
+  showSdErr('sdCustErr', '');
+  const name = document.getElementById('sdCustName').value.trim();
+  const address = document.getElementById('sdCustAddr').value.trim();
+  if (!name) {
+    showSdErr('sdCustErr', 'Bitte einen Namen eingeben.');
+    return;
+  }
+  try {
+    await api('/customers', {
+      method: 'POST',
+      body: JSON.stringify({ name, address: address || null }),
+    });
+    document.getElementById('sdCustName').value = '';
+    document.getElementById('sdCustAddr').value = '';
+    toast('Kunde hinzugefügt');
+    await loadStammdaten();
+  } catch (e) {
+    showSdErr('sdCustErr', e.message);
+  }
+}
+
+async function saveCustomer(id) {
+  showSdErr('sdCustErr', '');
+  const nameEl = document.getElementById(`sdCustName_${id}`);
+  const addrEl = document.getElementById(`sdCustAddr_${id}`);
+  const name = nameEl ? nameEl.value.trim() : '';
+  const address = addrEl ? addrEl.value.trim() : '';
+  if (!name) {
+    showSdErr('sdCustErr', 'Name darf nicht leer sein.');
+    return;
+  }
+  try {
+    await api(`/customers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name, address: address || null }),
+    });
+    toast('Kunde gespeichert');
+    await loadStammdaten();
+  } catch (e) {
+    showSdErr('sdCustErr', e.message);
+  }
+}
+
+function renderSites() {
+  const body = document.getElementById('sdSiteBody');
+  const count = document.getElementById('sdSiteCount');
+  if (!body) return;
+  if (count) count.textContent = String(SITES.length);
+  if (!SITES.length) {
+    body.innerHTML = '<tr><td colspan="5" style="color:var(--t3);">Noch keine Objekte.</td></tr>';
+    return;
+  }
+  body.innerHTML = SITES.map((s) => {
+    const id = escapeAttr(s.id);
+    const custName = s.customer?.name || '—';
+    const active = s.active !== false;
+    return `<tr class="${active ? '' : 'sd-row-inactive'}" data-id="${id}">
+      <td>${escapeAttr(s.label || '')}</td>
+      <td>${escapeAttr(custName)}</td>
+      <td>${escapeAttr(s.address || '—')}</td>
+      <td><span class="badge ${active ? 'bg' : 'br'}">${active ? 'aktiv' : 'inaktiv'}</span></td>
+      <td><div class="sd-actions">
+        <button type="button" class="btn btn-g" onclick="toggleSiteActive('${id}', ${active ? 'false' : 'true'})">${active ? 'Deaktivieren' : 'Aktivieren'}</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function addSite() {
+  showSdErr('sdSiteErr', '');
+  const customerId = document.getElementById('sdSiteCust').value;
+  const label = document.getElementById('sdSiteLabel').value.trim();
+  const address = document.getElementById('sdSiteAddr').value.trim();
+  if (!customerId) {
+    showSdErr('sdSiteErr', 'Bitte einen Kunden wählen.');
+    return;
+  }
+  if (!label) {
+    showSdErr('sdSiteErr', 'Bitte eine Bezeichnung eingeben.');
+    return;
+  }
+  try {
+    await api('/sites', {
+      method: 'POST',
+      body: JSON.stringify({ customerId, label, address: address || null }),
+    });
+    document.getElementById('sdSiteLabel').value = '';
+    document.getElementById('sdSiteAddr').value = '';
+    toast('Objekt hinzugefügt');
+    await loadStammdaten();
+  } catch (e) {
+    showSdErr('sdSiteErr', e.message);
+  }
+}
+
+async function toggleSiteActive(id, active) {
+  showSdErr('sdSiteErr', '');
+  try {
+    await api(`/sites/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active: active === true || active === 'true' }),
+    });
+    toast(active === true || active === 'true' ? 'Objekt aktiviert' : 'Objekt deaktiviert');
+    await loadStammdaten();
+  } catch (e) {
+    showSdErr('sdSiteErr', e.message);
+  }
+}
+
+function renderWorkTypes() {
+  const body = document.getElementById('sdWtBody');
+  const count = document.getElementById('sdWtCount');
+  if (!body) return;
+  if (count) count.textContent = String(WORK_TYPES.length);
+  if (!WORK_TYPES.length) {
+    body.innerHTML = '<tr><td colspan="4" style="color:var(--t3);">Noch keine Arbeitsarten.</td></tr>';
+    return;
+  }
+  body.innerHTML = WORK_TYPES.map((w) => {
+    const id = escapeAttr(w.id);
+    const active = w.active !== false;
+    const billable = w.billable !== false;
+    return `<tr class="${active ? '' : 'sd-row-inactive'}" data-id="${id}">
+      <td>${escapeAttr(w.label || '')}</td>
+      <td>${billable ? 'ja' : 'nein'}</td>
+      <td><span class="badge ${active ? 'bg' : 'br'}">${active ? 'aktiv' : 'inaktiv'}</span></td>
+      <td><div class="sd-actions">
+        <button type="button" class="btn btn-g" onclick="toggleWorkTypeActive('${id}', ${active ? 'false' : 'true'})">${active ? 'Deaktivieren' : 'Aktivieren'}</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function addWorkType() {
+  showSdErr('sdWtErr', '');
+  const label = document.getElementById('sdWtLabel').value.trim();
+  const billable = document.getElementById('sdWtBillable').checked;
+  if (!label) {
+    showSdErr('sdWtErr', 'Bitte eine Bezeichnung eingeben.');
+    return;
+  }
+  try {
+    await api('/work-types', {
+      method: 'POST',
+      body: JSON.stringify({ label, billable }),
+    });
+    document.getElementById('sdWtLabel').value = '';
+    document.getElementById('sdWtBillable').checked = true;
+    toast('Arbeitsart hinzugefügt');
+    await loadStammdaten();
+  } catch (e) {
+    showSdErr('sdWtErr', e.message);
+  }
+}
+
+async function toggleWorkTypeActive(id, active) {
+  showSdErr('sdWtErr', '');
+  try {
+    await api(`/work-types/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active: active === true || active === 'true' }),
+    });
+    toast(active === true || active === 'true' ? 'Arbeitsart aktiviert' : 'Arbeitsart deaktiviert');
+    await loadStammdaten();
+  } catch (e) {
+    showSdErr('sdWtErr', e.message);
+  }
 }
 
 function renderMeine() {
@@ -288,14 +706,17 @@ function renderMeine() {
     return;
   }
   list.innerHTML = wEntries
-    .map(
-      (en) => `
+    .map((en) => {
+      const siteLbl = entrySiteLabel(en);
+      const workLbl = entryWorkLabel(en);
+      const meta = [siteLbl, workLbl].filter(Boolean).join(' · ') || en.note || '—';
+      return `
     <div class="ei">
       <div class="ei-dot"></div>
       <div class="ei-date">${fmtD(en.date)}</div>
-      <div class="ei-time">${mStr(en.from)} – ${mStr(en.to)}</div>
+      <div class="ei-time">${entryTimeLabel(en)}</div>
       <div class="ei-dur">${mDur(net(en))}</div>
-      <div class="ei-note">${en.note || '—'}</div>
+      <div class="ei-note">${escapeAttr(meta)}</div>
       <div class="ei-acts">
         <div class="ib" onclick="openEdit('${en.id}')" title="Bearbeiten">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -304,8 +725,8 @@ function renderMeine() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
         </div>
       </div>
-    </div>`
-    )
+    </div>`;
+    })
     .join('');
 }
 
@@ -759,38 +1180,102 @@ function fillEntryEmp(selId) {
   s.innerHTML = EMPS.map((e) => `<option value="${e.id}" ${e.id === selId ? 'selected' : ''}>${formatEmpSelectLabel(e)}</option>`).join('');
 }
 
+function showEntryErr(msg) {
+  const el = document.getElementById('eEntryErr');
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.style.display = 'block';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
+  }
+}
+
+async function ensureEntryMasterData() {
+  if (SITES.length && WORK_TYPES.length) return;
+  const [sRes, wRes] = await Promise.all([api('/sites'), api('/work-types')]);
+  SITES = sRes.sites || [];
+  WORK_TYPES = wRes.workTypes || [];
+}
+
+function fillEntrySiteSelect(selectedId) {
+  const sel = document.getElementById('eSite');
+  if (!sel) return;
+  const active = SITES.filter((s) => s.active !== false);
+  if (!active.length) {
+    sel.innerHTML = '<option value="">Kein aktives Objekt</option>';
+    return;
+  }
+  sel.innerHTML = active
+    .map((s) => {
+      const cust = s.customer?.name || '';
+      const label = cust ? `${cust} — ${s.label}` : s.label;
+      return `<option value="${escapeAttr(s.id)}" ${s.id === selectedId ? 'selected' : ''}>${escapeAttr(label)}</option>`;
+    })
+    .join('');
+  if (selectedId && active.some((s) => s.id === selectedId)) sel.value = selectedId;
+}
+
+function fillEntryWorkTypeSelect(selectedId) {
+  const sel = document.getElementById('eWorkType');
+  if (!sel) return;
+  const active = WORK_TYPES.filter((w) => w.active !== false);
+  if (!active.length) {
+    sel.innerHTML = '<option value="">Keine aktive Arbeitsart</option>';
+    return;
+  }
+  sel.innerHTML = active
+    .map(
+      (w) =>
+        `<option value="${escapeAttr(w.id)}" ${w.id === selectedId ? 'selected' : ''}>${escapeAttr(w.label)}</option>`
+    )
+    .join('');
+  if (selectedId && active.some((w) => w.id === selectedId)) sel.value = selectedId;
+}
+
 function calcPreview() {
+  const calc = document.getElementById('eCalc');
+  if (!calc) return;
   const f = document.getElementById('eFrom').value;
   const t = document.getElementById('eTo').value;
   const b = +document.getElementById('eBrk').value || 0;
   if (!f || !t) {
-    document.getElementById('eCalc').textContent = '—';
+    calc.textContent = '—';
     return;
   }
   const [fh, fm] = f.split(':').map(Number);
   const [th, tm] = t.split(':').map(Number);
   const n = th * 60 + tm - (fh * 60 + fm) - b;
-  document.getElementById('eCalc').textContent = n > 0 ? mDur(n) : '⚠️ Ungültige Zeit';
+  calc.textContent = n > 0 ? mDur(n) : '⚠️ Ungültige Zeit';
 }
-['eFrom', 'eTo', 'eBrk'].forEach((id) => document.getElementById(id).addEventListener('input', calcPreview));
+['eFrom', 'eTo', 'eBrk'].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', calcPreview);
+});
 
-function openAdd(date) {
+async function openAdd(date) {
   if (IS_ADMIN && !EMPS.length) {
     toast('Bitte zuerst unter «Team verwalten» eine Person anlegen.');
     return;
   }
+  showEntryErr('');
   editId = null;
   fillEntryEmp(IS_ADMIN ? curUser : ME.id);
   document.getElementById('mEntryTitle').textContent = 'Stunden erfassen';
   document.getElementById('mEntrySub').textContent =
-    'Du kannst Einträge für jeden beliebigen Tag hinzufügen — auch nachträglich.';
+    'Mehrere Einträge am selben Tag für verschiedene Objekte sind möglich.';
   document.getElementById('eDate').value = date || today();
-  document.getElementById('eFrom').value = '07:00';
-  document.getElementById('eTo').value = '16:30';
-  document.getElementById('eBrk').value = '30';
+  document.getElementById('eHours').value = '8';
   document.getElementById('eNote').value = '';
   document.getElementById('eDel').style.display = 'none';
-  calcPreview();
+  try {
+    await ensureEntryMasterData();
+    fillEntrySiteSelect('');
+    fillEntryWorkTypeSelect('');
+  } catch (e) {
+    showEntryErr(e.message);
+  }
   document.getElementById('moEntry').classList.add('open');
 }
 
@@ -798,47 +1283,60 @@ function openAddDate(d) {
   openAdd(d);
 }
 
-function openEdit(id) {
+async function openEdit(id) {
   const en = ENTRIES.find((e) => e.id === id);
   if (!en) return;
+  showEntryErr('');
   editId = id;
   fillEntryEmp(en.empId);
   document.getElementById('mEntryTitle').textContent = 'Eintrag bearbeiten';
-  document.getElementById('mEntrySub').textContent = 'Passe die Zeiten an und speichere.';
+  document.getElementById('mEntrySub').textContent = 'Passe Objekt, Arbeit und Stunden an und speichere.';
   document.getElementById('eDate').value = en.date;
-  document.getElementById('eFrom').value = mStr(en.from);
-  document.getElementById('eTo').value = mStr(en.to);
-  document.getElementById('eBrk').value = en.brk;
+  document.getElementById('eHours').value =
+    en.hours != null ? String(en.hours) : String(Math.max(0.5, Math.round((net(en) / 60) * 2) / 2));
   document.getElementById('eNote').value = en.note || '';
   document.getElementById('eDel').style.display = '';
-  calcPreview();
+  try {
+    await ensureEntryMasterData();
+    fillEntrySiteSelect(en.siteId || '');
+    fillEntryWorkTypeSelect(en.workTypeId || '');
+  } catch (e) {
+    showEntryErr(e.message);
+  }
   document.getElementById('moEntry').classList.add('open');
 }
 
 async function saveEntry() {
+  showEntryErr('');
   const empId = document.getElementById('eEmp').value;
   const date = document.getElementById('eDate').value;
-  const f = document.getElementById('eFrom').value;
-  const t = document.getElementById('eTo').value;
-  const b = +document.getElementById('eBrk').value || 0;
+  const siteId = document.getElementById('eSite').value;
+  const workTypeId = document.getElementById('eWorkType').value;
+  const hours = Number(document.getElementById('eHours').value);
   const note = document.getElementById('eNote').value.trim();
-  if (!date || !f || !t) {
-    toast('Bitte alle Felder ausfüllen.');
+
+  if (!date) {
+    showEntryErr('Bitte ein Datum wählen.');
     return;
   }
-  const [fh, fm] = f.split(':').map(Number);
-  const [th, tm] = t.split(':').map(Number);
-  const from = fh * 60 + fm;
-  const to2 = th * 60 + tm;
-  if (to2 - from - b <= 0) {
-    toast('Nettozeit muss positiv sein.');
+  if (!siteId) {
+    showEntryErr('Bitte ein Objekt wählen.');
     return;
   }
+  if (!workTypeId) {
+    showEntryErr('Bitte eine Arbeitsart wählen.');
+    return;
+  }
+  if (!hours || hours < 0.5 || hours > 24) {
+    showEntryErr('Stunden müssen zwischen 0.5 und 24 liegen.');
+    return;
+  }
+
   const payload = {
     date,
-    fromMinutes: from,
-    toMinutes: to2,
-    breakMinutes: b,
+    siteId,
+    workTypeId,
+    hours,
     note,
   };
   try {
@@ -859,7 +1357,7 @@ async function saveEntry() {
     closeM('moEntry');
     refreshCur();
   } catch (e) {
-    toast(e.message);
+    showEntryErr(e.message);
   }
 }
 
@@ -961,7 +1459,6 @@ function initAfterLogin() {
   document.getElementById('aTo').value = `${cm}-${String(last).padStart(2, '0')}`;
   applyRoleUI();
   document.getElementById('eEmpFg').classList.toggle('hidden', !IS_ADMIN);
-  document.getElementById('eDateFg').classList.toggle('full', !IS_ADMIN);
   if (IS_ADMIN && EMPS.length) {
     curUser = EMPS[0].id;
     fillUserSwitcher();

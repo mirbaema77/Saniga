@@ -31,16 +31,21 @@ model User {
 }
 
 model TimeEntry {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   date         String
   fromMinutes  Int
   toMinutes    Int
-  breakMinutes Int      @default(0)
-  note         String   @default("")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  breakMinutes Int       @default(0)
+  note         String    @default("")
+  siteId       String?
+  site         Site?     @relation(fields: [siteId], references: [id])
+  workTypeId   String?
+  workType     WorkType? @relation(fields: [workTypeId], references: [id])
+  hours        Decimal?  @db.Decimal(5, 2)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([userId, date])
 }
@@ -54,18 +59,20 @@ model Customer {
 }
 
 model Site {
-  id         String   @id @default(cuid())
+  id         String      @id @default(cuid())
   customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
+  customer   Customer    @relation(fields: [customerId], references: [id])
   label      String
   address    String?
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  entries    TimeEntry[]
 }
 
 model WorkType {
-  id       String  @id @default(cuid())
+  id       String      @id @default(cuid())
   label    String
-  billable Boolean @default(true)
-  active   Boolean @default(true)
+  billable Boolean     @default(true)
+  active   Boolean     @default(true)
+  entries  TimeEntry[]
 }

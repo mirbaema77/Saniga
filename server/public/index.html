@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8"/>
+<meta charset="utf-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Saniga AG â€“ Zeiterfassung</title>
+<title>Saniga AG – Zeiterfassung</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -49,7 +50,7 @@ body {
 }
 .app { display:flex; min-height:100vh; }
 
-/* â”€â”€ SIDEBAR â”€â”€ */
+/* ── SIDEBAR ── */
 .sidebar {
   width: 252px; flex-shrink: 0;
   background: linear-gradient(175deg, #1a2e36 0%, #15282f 100%);
@@ -101,7 +102,7 @@ body {
 .user-n { font-size:13px;font-weight:600;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 .user-r { font-size:10px;color:rgba(255,255,255,.38);font-family:'JetBrains Mono'; }
 
-/* â”€â”€ MAIN â”€â”€ */
+/* ── MAIN ── */
 .main { flex:1;display:flex;flex-direction:column;min-width:0; }
 .topbar {
   height:60px;background:var(--glass-b);backdrop-filter:blur(20px);
@@ -114,17 +115,17 @@ body {
 #userSwitcher { background:var(--bg);border:1px solid var(--border-med);color:var(--t2);padding:6px 10px;border-radius:8px;font-size:12px;font-family:'JetBrains Mono';cursor:pointer; }
 .content { flex:1;padding:28px;overflow-y:auto; }
 
-/* â”€â”€ VIEWS â”€â”€ */
+/* ── VIEWS ── */
 .view { display:none;animation:fadeUp .22s ease; }
 .view.active { display:block; }
 @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
 
-/* â”€â”€ CARDS â”€â”€ */
+/* ── CARDS ── */
 .card { background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow); }
 .card-header { padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px; }
 .card-title { font-size:15px;font-weight:700;flex:1;color:var(--t1); }
 
-/* â”€â”€ STATS â”€â”€ */
+/* ── STATS ── */
 .stats-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px; }
 .stat-card { background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow);position:relative;overflow:hidden; }
 .stat-accent { position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius) var(--radius) 0 0; }
@@ -132,13 +133,13 @@ body {
 .stat-val { font-size:30px;font-weight:800;color:var(--t1);line-height:1; }
 .stat-sub { font-size:12px;color:var(--t3);margin-top:5px; }
 
-/* â”€â”€ GRID â”€â”€ */
+/* ── GRID ── */
 .grid2 { display:grid;grid-template-columns:1fr 1fr;gap:20px; }
 .grid3 { display:grid;grid-template-columns:repeat(3,1fr);gap:16px; }
 .mb20 { margin-bottom:20px; }
 .mb24 { margin-bottom:24px; }
 
-/* â”€â”€ TABLE â”€â”€ */
+/* ── TABLE ── */
 table { width:100%;border-collapse:collapse; }
 thead th { text-align:left;padding:10px 18px;font-size:10.5px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);background:rgba(238,248,252,.65); }
 tbody tr { border-bottom:1px solid var(--border);transition:background .1s; }
@@ -146,7 +147,7 @@ tbody tr:last-child { border-bottom:none; }
 tbody tr:hover { background:rgba(240,242,247,.6); }
 td { padding:12px 18px;font-size:13.5px;color:var(--t1); }
 
-/* â”€â”€ BADGES â”€â”€ */
+/* ── BADGES ── */
 .badge { display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;font-family:'JetBrains Mono'; }
 .bg  { background:var(--green-b);color:var(--green); }
 .br  { background:var(--red-b);color:var(--red); }
@@ -155,7 +156,49 @@ td { padding:12px 18px;font-size:13.5px;color:var(--t1); }
 .bo  { background:rgba(18,184,225,.12);color:#0e7490; }
 .bdot { width:6px;height:6px;border-radius:50%;background:currentColor; }
 
-/* â”€â”€ BUTTONS â”€â”€ */
+/* ── STAMMDATEN ── */
+.sd-tabs { display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap; }
+.sd-tab {
+  padding:8px 16px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;
+  background:var(--bg);color:var(--t2);border:1px solid var(--border-med);
+  font-family:'Plus Jakarta Sans',sans-serif;transition:all .16s;
+}
+.sd-tab:hover { background:white;border-color:var(--t3); }
+.sd-tab.active { background:linear-gradient(135deg,#12B8E1,#3dc4ea);color:white;border-color:transparent;box-shadow:0 4px 16px rgba(18,184,225,.28); }
+.sd-panel { display:none; }
+.sd-panel.active { display:block; }
+.sd-form { display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-bottom:16px; }
+.sd-form .fg-check { display:flex;align-items:center;gap:8px;padding-bottom:10px; }
+.sd-form .fg-check input { width:auto; }
+.sd-err { color:var(--red);font-size:13px;margin:0 0 12px;display:none; }
+.sd-row-inactive { opacity:.55;background:rgba(240,242,247,.85); }
+.sd-row-inactive:hover { background:rgba(240,242,247,.95); }
+.sd-inline-input { margin:0;padding:7px 10px;font-size:13px; }
+.sd-actions { display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end; }
+
+.legacy-time-fields { display:none !important; }
+
+/* ── RAPPORTE ── */
+.rp-toolbar { display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px; }
+.rp-week-label {
+  font-size:15px;font-weight:700;color:var(--t1);min-width:220px;text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+.rp-customer { margin-bottom:18px; }
+.rp-customer-head {
+  display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);
+}
+.rp-customer-name { font-size:17px;font-weight:800; }
+.rp-customer-total { font-size:13px;font-weight:700;color:var(--t2);font-family:'JetBrains Mono',monospace; }
+.rp-site { background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-s);padding:14px 16px;margin-bottom:10px; }
+.rp-site:last-child { margin-bottom:0; }
+.rp-site-head { display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px; }
+.rp-site-label { font-size:14px;font-weight:700; }
+.rp-site-total { font-size:12px;font-weight:700;color:var(--saniga-red);font-family:'JetBrains Mono',monospace; }
+.rp-empty { text-align:center;padding:40px 20px;color:var(--t3);font-size:14px; }
+
+/* ── BUTTONS ── */
 .btn { display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .16s;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap; }
 .btn svg { width:14px;height:14px; }
 .btn-p { background:linear-gradient(135deg,#12B8E1,#3dc4ea);color:white;box-shadow:0 4px 16px rgba(18,184,225,.28); }
@@ -165,7 +208,7 @@ td { padding:12px 18px;font-size:13.5px;color:var(--t1); }
 .btn-d { background:var(--red-b);color:var(--red);border:1px solid rgba(220,38,38,.2); }
 .btn-d:hover { background:var(--red);color:white; }
 
-/* â”€â”€ FORMS â”€â”€ */
+/* ── FORMS ── */
 .form-row  { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
 .form-row3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px; }
 .fg { display:flex;flex-direction:column;gap:6px; }
@@ -179,7 +222,7 @@ input,select,textarea {
 input:focus,select:focus,textarea:focus { outline:none;border-color:var(--saniga-red);box-shadow:0 0 0 3px rgba(18,184,225,.12);background:white; }
 select option { background:white; }
 
-/* â”€â”€ MODAL â”€â”€ */
+/* ── MODAL ── */
 .mo { position:fixed;inset:0;background:rgba(26,35,50,.42);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .22s; }
 .mo.open { opacity:1;pointer-events:all; }
 .mo-box { background:white;border:1px solid var(--border);border-radius:18px;width:520px;max-width:95vw;padding:28px;box-shadow:var(--shadow-xl);transform:scale(.96) translateY(8px);transition:transform .22s; }
@@ -188,7 +231,7 @@ select option { background:white; }
 .mo-sub { font-size:13px;color:var(--t2);margin-bottom:22px; }
 .mo-actions { display:flex;justify-content:flex-end;gap:10px;margin-top:24px; }
 
-/* â”€â”€ ENTRY LIST â”€â”€ */
+/* ── ENTRY LIST ── */
 .ei { display:flex;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid var(--border);transition:background .12s; }
 .ei:last-child { border-bottom:none; }
 .ei:hover { background:rgba(240,242,247,.6); }
@@ -204,7 +247,7 @@ select option { background:white; }
 .ib svg { width:13px;height:13px; }
 .ib.del:hover { background:var(--red-b);border-color:rgba(220,38,38,.3);color:var(--red); }
 
-/* â”€â”€ QUICK ADD â”€â”€ */
+/* ── QUICK ADD ── */
 .quick-add {
   background:linear-gradient(135deg,rgba(18,184,225,.05),rgba(61,200,234,.03));
   border:1.5px dashed rgba(18,184,225,.28);border-radius:var(--radius);
@@ -217,7 +260,7 @@ select option { background:white; }
 .qa-t { font-size:14px;font-weight:600;color:var(--saniga-red); }
 .qa-s { font-size:12px;color:var(--t3);margin-top:1px; }
 
-/* â”€â”€ WEEK STRIP â”€â”€ */
+/* ── WEEK STRIP ── */
 .wstrip { display:flex;gap:8px;margin-bottom:22px; }
 .wd {
   flex:1;background:white;border:1px solid var(--border);border-radius:var(--radius-s);
@@ -231,11 +274,11 @@ select option { background:white; }
 .wd-d { font-size:20px;font-weight:800;color:var(--t1);margin:2px 0; }
 .wd-h { font-size:10.5px;font-family:'JetBrains Mono';color:var(--t2); }
 
-/* â”€â”€ PROGRESS â”€â”€ */
+/* ── PROGRESS ── */
 .pb { height:8px;background:var(--bg);border-radius:4px;overflow:hidden; }
 .pf { height:100%;border-radius:4px;transition:width .4s; }
 
-/* â”€â”€ EMP CARD â”€â”€ */
+/* ── EMP CARD ── */
 .emp-card { background:white;border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);transition:box-shadow .18s,transform .18s,border-color .18s; }
 .emp-card:hover { box-shadow:var(--shadow-l);transform:translateY(-2px); }
 .emp-av { width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:white;flex-shrink:0; }
@@ -260,19 +303,19 @@ select option { background:white; }
 .team-prof-actions { margin-top:16px;padding-top:16px;border-top:1px solid var(--border); }
 .team-prof-del-hint { font-size:11px;color:var(--t3);margin-top:10px;line-height:1.45; }
 
-/* â”€â”€ SALARY â”€â”€ */
+/* ── SALARY ── */
 .sal-row { display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border); }
 .sal-row:last-child { border-bottom:none; }
 .payroll-rules-card .payroll-deduction-rows { margin-top:4px; }
 .payroll-ded-row { display:grid;grid-template-columns:1fr 130px 100px 44px;gap:8px;align-items:end;margin-bottom:10px; }
 @media (max-width:700px) { .payroll-ded-row { grid-template-columns:1fr 1fr; } .payroll-ded-row .btn-d { grid-column:1 / -1;justify-self:start; } }
 
-/* â”€â”€ SCROLLBAR â”€â”€ */
+/* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width:5px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--border-med);border-radius:10px; }
 
-/* â”€â”€ TOAST â”€â”€ */
+/* ── TOAST ── */
 .toast { position:fixed;bottom:24px;right:24px;background:var(--saniga-dark);color:white;border-radius:12px;padding:14px 18px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-xl);z-index:300;transform:translateY(80px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);max-width:320px; }
 .toast.show { transform:translateY(0);opacity:1; }
 .toast svg { width:18px;height:18px;color:var(--saniga-red-l);flex-shrink:0; }
@@ -314,7 +357,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 <div id="authGate">
   <div class="auth-card">
     <h1>Saniga Zeiterfassung</h1>
-    <p>Anmelden mit Ihrer E-Mail und Ihrem Passwort. Mitarbeitende ohne Konto kÃ¶nnen sich Ã¼ber den Einladungslink registrieren.</p>
+    <p>Anmelden mit Ihrer E-Mail und Ihrem Passwort. Mitarbeitende ohne Konto können sich über den Einladungslink registrieren.</p>
     <p style="font-size:12px;color:var(--t3);line-height:1.45;">Alle sehen « Lohnabrechnung » (eigene Übersicht; PDF-Druck). Konten mit Rolle <strong>Admin</strong> sehen zusätzlich « Geschäftsführung » (Dashboard, Team, alle Einträge) und können Lohn-Parameter bearbeiten.</p>
     <div class="fg" style="margin-bottom:14px;">
       <label>E-Mail</label>
@@ -322,11 +365,11 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     </div>
     <div class="fg" style="margin-bottom:18px;">
       <label>Passwort</label>
-      <input type="password" id="loginPassword" autocomplete="current-password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
+      <input type="password" id="loginPassword" autocomplete="current-password" placeholder="••••••••">
     </div>
     <button type="button" class="btn btn-p" style="width:100%;justify-content:center;margin-bottom:14px;" id="loginBtn">Anmelden</button>
     <div style="text-align:center;">
-      <a href="/join.html">Als Mitarbeitende:r registrieren â†’</a>
+      <a href="/join.html">Als Mitarbeitende:r registrieren →</a>
     </div>
     <p id="loginErr" style="color:var(--red);font-size:13px;margin-top:14px;display:none;"></p>
   </div>
@@ -347,7 +390,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     </div>
     <div class="nav-item" onclick="showView('monat')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      MonatsÃ¼bersicht
+      Monatsübersicht
     </div>
     <div class="nav-item" onclick="showView('lohn')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -362,9 +405,17 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Team verwalten
     </div>
+    <div class="nav-item admin-only-nav hidden" onclick="showView('stammdaten')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h18"/><circle cx="8" cy="7" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="16" cy="17" r="1.5" fill="currentColor"/></svg>
+      Stammdaten
+    </div>
     <div class="nav-item admin-only-nav hidden" onclick="showView('alle')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-      Alle EintrÃ¤ge
+      Alle Einträge
+    </div>
+    <div class="nav-item admin-only-nav hidden" onclick="showView('rapporte')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+      Rapporte
     </div>
   </nav>
   <div class="sidebar-bottom">
@@ -372,7 +423,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       <div class="user-av" id="sAv">MH</div>
       <div style="flex:1;min-width:0;">
         <div class="user-n" id="sName">Marco Huber</div>
-        <div class="user-r" id="sRole">Monteur SanitÃ¤r</div>
+        <div class="user-r" id="sRole">Monteur Sanitär</div>
       </div>
     </div>
   </div>
@@ -383,7 +434,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   <div class="topbar">
     <div class="topbar-title" id="topTitle">Meine Zeiten</div>
     <div class="topbar-date" id="topDate"></div>
-    <a href="/join.html" id="inviteLink" class="btn btn-g admin-only-nav hidden" style="text-decoration:none;">Link fÃ¼r Mitarbeitende</a>
+    <a href="/join.html" id="inviteLink" class="btn btn-g admin-only-nav hidden" style="text-decoration:none;">Link für Mitarbeitende</a>
     <span id="userSwitchWrap" class="admin-only-nav hidden">
       <select id="userSwitcher" onchange="switchUser(this.value)"></select>
     </span>
@@ -391,14 +442,14 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   </div>
   <div class="content">
 
-    <!-- â•â•â• MEINE ZEITEN â•â•â• -->
+    <!-- ═══ MEINE ZEITEN ═══ -->
     <div class="view active" id="view-meine">
       <div class="wstrip" id="weekStrip"></div>
       <div class="quick-add" onclick="openAdd()">
         <div class="qa-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
         <div>
           <div class="qa-t">Stunden erfassen</div>
-          <div class="qa-s">Eintrag fÃ¼r heute oder jeden anderen Tag hinzufÃ¼gen â€” auch nachtrÃ¤glich</div>
+          <div class="qa-s">Eintrag für heute oder jeden anderen Tag hinzufügen — auch nachträglich</div>
         </div>
       </div>
       <div class="grid2">
@@ -411,34 +462,34 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         </div>
         <div>
           <div class="card mb20" style="padding:20px;">
-            <div class="stat-lbl" style="margin-bottom:8px;" id="mMonthLabel">â€” Fortschritt</div>
+            <div class="stat-lbl" style="margin-bottom:8px;" id="mMonthLabel">— Fortschritt</div>
             <div style="font-size:36px;font-weight:800;line-height:1;" id="mHrs">0h</div>
             <div style="font-size:12px;color:var(--t3);margin-top:4px;margin-bottom:14px;" id="mSub">von 184h Soll</div>
             <div class="pb" style="margin-bottom:6px;"><div class="pf" id="mProg" style="width:0%;background:linear-gradient(90deg,var(--saniga-red),var(--saniga-red-l));"></div></div>
-            <div style="font-size:11px;color:var(--t3);" id="mPct">0% erfÃ¼llt</div>
+            <div style="font-size:11px;color:var(--t3);" id="mPct">0% erfüllt</div>
           </div>
           <div class="card" style="padding:20px;">
             <div class="stat-lbl" style="margin-bottom:6px;" id="mLohnLabel">Erwarteter Lohn</div>
-            <div style="font-size:26px;font-weight:800;color:var(--green);line-height:1;" id="mLohn">CHF 0.â€“</div>
-            <div style="font-size:12px;color:var(--t3);margin-top:4px;" id="mRate">bei CHF 35.â€“/h</div>
+            <div style="font-size:26px;font-weight:800;color:var(--green);line-height:1;" id="mLohn">CHF 0.–</div>
+            <div style="font-size:12px;color:var(--t3);margin-top:4px;" id="mRate">bei CHF 35.–/h</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- â•â•â• MONATSÃœBERSICHT â•â•â• -->
+    <!-- ═══ MONATSÜBERSICHT ═══ -->
     <div class="view" id="view-monat">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;">
         <select id="monSel" onchange="renderMonat()" style="width:auto;"></select>
         <div style="flex:1;"></div>
         <button class="btn btn-p" onclick="openAdd()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Eintrag hinzufÃ¼gen
+          Eintrag hinzufügen
         </button>
       </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-title" id="monTitle">MÃ¤rz 2026</div>
+          <div class="card-title" id="monTitle">März 2026</div>
           <span class="badge bo" id="monBadge">0h</span>
         </div>
         <table>
@@ -448,32 +499,32 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       </div>
     </div>
 
-    <!-- â•â•â• DASHBOARD â•â•â• -->
+    <!-- ═══ DASHBOARD ═══ -->
     <div class="view" id="view-dashboard">
       <div class="stats-grid mb24">
         <div class="stat-card">
           <div class="stat-accent" style="background:linear-gradient(90deg,var(--saniga-red),var(--saniga-red-l));"></div>
           <div class="stat-lbl">Team heute</div>
-          <div class="stat-val" style="color:var(--saniga-red);" id="dAct">â€”</div>
-          <div class="stat-sub">EintrÃ¤ge erfasst</div>
+          <div class="stat-val" style="color:var(--saniga-red);" id="dAct">—</div>
+          <div class="stat-sub">Einträge erfasst</div>
         </div>
         <div class="stat-card">
           <div class="stat-accent" style="background:var(--green);"></div>
           <div class="stat-lbl">Stunden diese Woche</div>
-          <div class="stat-val" id="dWk">â€”</div>
+          <div class="stat-val" id="dWk">—</div>
           <div class="stat-sub">alle Mitarbeiter</div>
         </div>
         <div class="stat-card">
           <div class="stat-accent" style="background:var(--blue);"></div>
-          <div class="stat-lbl">Stunden MÃ¤rz</div>
-          <div class="stat-val" id="dMon">â€”</div>
+          <div class="stat-lbl">Stunden März</div>
+          <div class="stat-val" id="dMon">—</div>
           <div class="stat-sub" id="dMonSub">von Soll</div>
         </div>
         <div class="stat-card">
           <div class="stat-accent" style="background:var(--yellow);"></div>
-          <div class="stat-lbl">Lohnkosten MÃ¤rz</div>
-          <div class="stat-val" style="font-size:21px;" id="dLohn">â€”</div>
-          <div class="stat-sub">Brutto geschÃ¤tzt</div>
+          <div class="stat-lbl">Lohnkosten März</div>
+          <div class="stat-val" style="font-size:21px;" id="dLohn">—</div>
+          <div class="stat-sub">Brutto geschätzt</div>
         </div>
       </div>
       <div class="grid2">
@@ -501,7 +552,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         <div style="flex:1;"></div>
         <button class="btn btn-p" onclick="openAddEmp()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Mitarbeiter hinzufÃ¼gen
+          Mitarbeiter hinzufügen
         </button>
       </div>
       <div class="team-page-layout">
@@ -549,7 +600,86 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             </div>
           </div>
 
-    <!-- â•â•â• LOHN â•â•â• -->
+    <!-- ═══ STAMMDATEN ═══ -->
+    <div class="view" id="view-stammdaten">
+      <div class="sd-tabs" role="tablist">
+        <button type="button" class="sd-tab active" data-sd-tab="kunden" onclick="showStammdatenTab('kunden')">Kunden</button>
+        <button type="button" class="sd-tab" data-sd-tab="objekte" onclick="showStammdatenTab('objekte')">Objekte</button>
+        <button type="button" class="sd-tab" data-sd-tab="arbeitsarten" onclick="showStammdatenTab('arbeitsarten')">Arbeitsarten</button>
+      </div>
+
+      <div class="sd-panel active" id="sd-panel-kunden">
+        <div class="card" style="padding:20px 22px;margin-bottom:16px;">
+          <div class="card-title" style="margin-bottom:14px;">Kunde hinzufügen</div>
+          <div class="sd-form">
+            <div class="fg"><label>Name *</label><input type="text" id="sdCustName" placeholder="z.B. Muster AG" maxlength="200"></div>
+            <div class="fg"><label>Adresse (optional)</label><input type="text" id="sdCustAddr" placeholder="Strasse, PLZ Ort" maxlength="500"></div>
+            <button type="button" class="btn btn-p" onclick="addCustomer()">Hinzufügen</button>
+          </div>
+          <p class="sd-err" id="sdCustErr"></p>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Kunden</div>
+            <span class="badge bo" id="sdCustCount">0</span>
+          </div>
+          <table>
+            <thead><tr><th>Name</th><th>Adresse</th><th></th></tr></thead>
+            <tbody id="sdCustBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="sd-panel" id="sd-panel-objekte">
+        <div class="card" style="padding:20px 22px;margin-bottom:16px;">
+          <div class="card-title" style="margin-bottom:14px;">Objekt hinzufügen</div>
+          <div class="sd-form" style="grid-template-columns:1fr 1fr 1fr auto;">
+            <div class="fg"><label>Kunde *</label><select id="sdSiteCust"></select></div>
+            <div class="fg"><label>Bezeichnung *</label><input type="text" id="sdSiteLabel" placeholder="z.B. Baustelle Hinwil" maxlength="200"></div>
+            <div class="fg"><label>Adresse (optional)</label><input type="text" id="sdSiteAddr" placeholder="Strasse, PLZ Ort" maxlength="500"></div>
+            <button type="button" class="btn btn-p" onclick="addSite()">Hinzufügen</button>
+          </div>
+          <p class="sd-err" id="sdSiteErr"></p>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Objekte</div>
+            <span class="badge bo" id="sdSiteCount">0</span>
+          </div>
+          <table>
+            <thead><tr><th>Bezeichnung</th><th>Kunde</th><th>Adresse</th><th>Status</th><th></th></tr></thead>
+            <tbody id="sdSiteBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="sd-panel" id="sd-panel-arbeitsarten">
+        <div class="card" style="padding:20px 22px;margin-bottom:16px;">
+          <div class="card-title" style="margin-bottom:14px;">Arbeitsart hinzufügen</div>
+          <div class="sd-form" style="grid-template-columns:1fr auto auto;">
+            <div class="fg"><label>Bezeichnung *</label><input type="text" id="sdWtLabel" placeholder="z.B. Montage" maxlength="200"></div>
+            <div class="fg-check">
+              <input type="checkbox" id="sdWtBillable" checked>
+              <label for="sdWtBillable" style="margin:0;">verrechenbar</label>
+            </div>
+            <button type="button" class="btn btn-p" onclick="addWorkType()">Hinzufügen</button>
+          </div>
+          <p class="sd-err" id="sdWtErr"></p>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Arbeitsarten</div>
+            <span class="badge bo" id="sdWtCount">0</span>
+          </div>
+          <table>
+            <thead><tr><th>Bezeichnung</th><th>verrechenbar</th><th>Status</th><th></th></tr></thead>
+            <tbody id="sdWtBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LOHN ═══ -->
     <div class="view" id="view-lohn">
       <p id="lohnReadOnlyHint" class="lohn-readonly-hint hidden">Sie sehen Ihre Lohnübersicht nur zur Ansicht. Monat wechseln und als PDF drucken ist möglich; Lohn-Parameter bearbeitet die Geschäftsführung.</p>
       <div class="lohn-toolbar">
@@ -567,7 +697,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px;">
           <div>
             <div class="card-title" style="margin-bottom:6px;">Lohn-Parameter</div>
-            <p style="font-size:12px;color:var(--t3);line-height:1.45;max-width:720px;">Spesen- und Abzugsregeln fÃ¼r diese Vorschau (im Browser gespeichert). Der Stundenlohn pro Person stammt aus den Mitarbeiterstammdaten (<code>hourlyRate</code> per API/Personal anlegen). Prozent-AbzÃ¼ge beziehen sich aufs Brutto (Basislohn + Spesen).</p>
+            <p style="font-size:12px;color:var(--t3);line-height:1.45;max-width:720px;">Spesen- und Abzugsregeln für diese Vorschau (im Browser gespeichert). Der Stundenlohn pro Person stammt aus den Mitarbeiterstammdaten (<code>hourlyRate</code> per API/Personal anlegen). Prozent-Abzüge beziehen sich aufs Brutto (Basislohn + Spesen).</p>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" class="btn btn-g" onclick="payrollAddDeduction()">Abzugszeile</button>
@@ -614,7 +744,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       </div>
     </div>
 
-    <!-- â•â•â• ALLE â•â•â• -->
+    <!-- ═══ ALLE ═══ -->
     <div class="view" id="view-alle">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;">
         <select id="aEmpF" onchange="renderAlle()" style="width:180px;"><option value="">Alle Mitarbeiter</option></select>
@@ -623,12 +753,12 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         <div style="flex:1;"></div>
         <button class="btn btn-p" onclick="openAdd()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Eintrag hinzufÃ¼gen
+          Eintrag hinzufügen
         </button>
       </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-title">ZeiteintrÃ¤ge</div>
+          <div class="card-title">Zeiteinträge</div>
           <span class="badge bo" id="aCount">0</span>
         </div>
         <table>
@@ -636,6 +766,16 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           <tbody id="aBody"></tbody>
         </table>
       </div>
+    </div>
+
+    <!-- ═══ RAPPORTE ═══ -->
+    <div class="view" id="view-rapporte">
+      <div class="rp-toolbar">
+        <button type="button" class="btn btn-g" onclick="shiftReportWeek(-1)">← Vorherige Woche</button>
+        <div class="rp-week-label" id="rpWeekLabel">KW —</div>
+        <button type="button" class="btn btn-g" onclick="shiftReportWeek(1)">Nächste Woche →</button>
+      </div>
+      <div id="rpBody"></div>
     </div>
 
   </div>
@@ -646,30 +786,47 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 <div class="mo" id="moEntry">
   <div class="mo-box">
     <div class="mo-title" id="mEntryTitle">Stunden erfassen</div>
-    <div class="mo-sub" id="mEntrySub">Du kannst EintrÃ¤ge fÃ¼r jeden beliebigen Tag hinzufÃ¼gen â€” auch nachtrÃ¤glich.</div>
-    <div class="form-row" style="margin-bottom:14px;" id="eEmpRow">
-      <div class="fg" id="eEmpFg"><label>Mitarbeiter</label><select id="eEmp"></select></div>
-      <div class="fg" id="eDateFg"><label>Datum</label><input type="date" id="eDate"></div>
+    <div class="mo-sub" id="mEntrySub">Du kannst Einträge für jeden beliebigen Tag hinzufügen — auch nachträglich.</div>
+    <div class="fg" style="margin-bottom:14px;" id="eEmpFg">
+      <label>Mitarbeiter</label>
+      <select id="eEmp"></select>
     </div>
-    <div class="form-row3" style="margin-bottom:14px;">
+    <div class="fg" style="margin-bottom:14px;" id="eDateFg">
+      <label>Datum</label>
+      <input type="date" id="eDate">
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Objekt</label>
+      <select id="eSite"></select>
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Arbeit</label>
+      <select id="eWorkType"></select>
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Stunden</label>
+      <input type="number" id="eHours" min="0.5" max="24" step="0.5" value="8">
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Bemerkung (optional)</label>
+      <input type="text" id="eNote" placeholder="z.B. Material geliefert">
+    </div>
+    <p id="eEntryErr" style="color:var(--red);font-size:13px;margin:0 0 12px;display:none;"></p>
+    <div class="form-row3 legacy-time-fields" style="margin-bottom:14px;">
       <div class="fg"><label>Von</label><input type="time" id="eFrom" value="07:00"></div>
       <div class="fg"><label>Bis</label><input type="time" id="eTo"   value="16:30"></div>
       <div class="fg"><label>Pause (Min.)</label><input type="number" id="eBrk" value="30" min="0" max="120"></div>
     </div>
-    <div class="fg" style="margin-bottom:14px;">
-      <label>Projekt / Notiz (optional)</label>
-      <input type="text" id="eNote" placeholder="z.B. Baustelle Hinwil â€“ Heizungsanlage">
-    </div>
-    <div style="background:rgba(18,184,225,.06);border:1px solid rgba(18,184,225,.14);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:16px;">
+    <div class="legacy-time-fields" style="background:rgba(18,184,225,.06);border:1px solid rgba(18,184,225,.14);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:16px;">
       <div>
         <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">Nettoarbeitszeit</div>
-        <div style="font-size:24px;font-weight:800;color:var(--saniga-red);margin-top:2px;" id="eCalc">â€”</div>
+        <div style="font-size:24px;font-weight:800;color:var(--saniga-red);margin-top:2px;" id="eCalc">—</div>
       </div>
       <div style="width:1px;height:40px;background:var(--border);"></div>
-      <div style="font-size:12px;color:var(--t2);">Brutto â€“ Pause = Nettozeit.<br>Diese wird fÃ¼r den Lohn berechnet.</div>
+      <div style="font-size:12px;color:var(--t2);">Brutto – Pause = Nettozeit.<br>Diese wird für den Lohn berechnet.</div>
     </div>
     <div class="mo-actions">
-      <button class="btn btn-d" id="eDel" onclick="deleteEntry()" style="margin-right:auto;display:none;">LÃ¶schen</button>
+      <button class="btn btn-d" id="eDel" onclick="deleteEntry()" style="margin-right:auto;display:none;">Löschen</button>
       <button class="btn btn-g" onclick="closeM('moEntry')">Abbrechen</button>
       <button class="btn btn-p" onclick="saveEntry()">Speichern</button>
     </div>
@@ -679,7 +836,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 <!-- MODAL: MITARBEITER -->
 <div class="mo" id="moEmp">
   <div class="mo-box">
-    <div class="mo-title">Mitarbeiter hinzufÃ¼gen</div>
+    <div class="mo-title">Mitarbeiter hinzufügen</div>
     <div class="mo-sub">Neuer Mitarbeiter im Saniga-Team.</div>
     <div class="form-row" style="margin-bottom:14px;">
       <div class="fg"><label>E-Mail (Login)</label><input type="email" id="eEmail" placeholder="mitarbeiter@firma.ch" autocomplete="off"></div>
@@ -692,8 +849,8 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     <div class="form-row" style="margin-bottom:14px;">
       <div class="fg"><label>Funktion</label>
         <select id="eRole">
-          <option>Monteur SanitÃ¤r</option><option>Monteur Heizung</option>
-          <option>Monteur LÃ¼ftung</option><option>Lehrling</option>
+          <option>Monteur Sanitär</option><option>Monteur Heizung</option>
+          <option>Monteur Lüftung</option><option>Lehrling</option>
         </select>
       </div>
       <div class="fg"><label>Stundenlohn (CHF)</label><input type="number" id="eRate" value="35"></div>
@@ -704,7 +861,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     </div>
     <div class="mo-actions">
       <button class="btn btn-g" onclick="closeM('moEmp')">Abbrechen</button>
-      <button class="btn btn-p" onclick="addEmp()">HinzufÃ¼gen</button>
+      <button class="btn btn-p" onclick="addEmp()">Hinzufügen</button>
     </div>
   </div>
 </div>

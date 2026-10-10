@@ -12,6 +12,10 @@ const { ensureAdmin } = require('./bootstrap');
 const authRoutes = require('./routes/auth');
 const employeesRoutes = require('./routes/employees');
 const entriesRoutes = require('./routes/entries');
+const customersRoutes = require('./routes/customers');
+const sitesRoutes = require('./routes/sites');
+const workTypesRoutes = require('./routes/workTypes');
+const reportsRoutes = require('./routes/reports');
 
 const app = express();
 const PORT = Number(process.env.PORT, 10) || 3000;
@@ -26,6 +30,15 @@ app.use(
 );
 app.use(express.json({ limit: '1mb' }));
 
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    return originalJson(body);
+  };
+  next();
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'saniga-zeiterfassung' });
 });
@@ -33,11 +46,24 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeesRoutes);
 app.use('/api/time-entries', entriesRoutes);
+app.use('/api/customers', customersRoutes);
+app.use('/api/sites', sitesRoutes);
+app.use('/api/work-types', workTypesRoutes);
+app.use('/api/reports', reportsRoutes);
 
-app.use(express.static(publicDir));
+app.use(
+  express.static(publicDir, {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      }
+    },
+  })
+);
 
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.sendFile(path.join(publicDir, 'index.html'), (err) => {
     if (err) next(err);
   });
