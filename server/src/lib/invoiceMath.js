@@ -117,17 +117,33 @@ function buildInvoiceView(invoice) {
   const lineItems = buildLineItems(invoice.entries || []);
   const vatRate = Number(invoice.vatRate);
   const totals = totalsFromLines(lineItems, vatRate);
+  const siteLabel = invoice.site?.label || '';
+  const periodFromLabel = formatDeDate(invoice.periodFrom, { utc: true });
+  const periodToLabel = formatDeDate(invoice.periodTo, { utc: true });
   return {
     number: invoice.number,
     customerName: invoice.customer?.name || '',
     customerAddress: invoice.customer?.address || '',
-    siteLabel: invoice.site?.label || '',
+    siteLabel,
     issueDateLabel: formatDeDate(invoice.issueDate),
-    periodFromLabel: formatDeDate(invoice.periodFrom, { utc: true }),
-    periodToLabel: formatDeDate(invoice.periodTo, { utc: true }),
+    periodFromLabel,
+    periodToLabel,
     vatRate,
     vatRateLabel: formatVatRate(vatRate),
     hourlyRate: HOURLY_RATE_CHF,
+    metaRows: [
+      { label: 'MWST.-Nr.', value: 'CHE-298.414.455' },
+      { label: 'Objekt-Liegenschaft', value: siteLabel },
+      { label: 'Objekt-Nr.', value: '' },
+      { label: 'Arbeitsgattung', value: '"BKP 250 Sanitäranlagen"' },
+      { label: 'Ausführungsdatum', value: `${periodFromLabel} – ${periodToLabel}` },
+    ],
+    footerLines: [
+      'Zahlungsbedingungen: 14 Tage netto',
+      'Wir bedanken uns für den Auftrag und die Zusammenarbeit.',
+      'Freundliche Grüsse',
+      'Saniga AG',
+    ],
     lineItems,
     ...totals,
   };
