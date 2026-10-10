@@ -17,8 +17,8 @@ let reportWeek = null;
 const MOS = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
 function currentMonthKey() {
-  const n = new Date();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+  const ymd = IsoWeek.zonedYmd(new Date());
+  return ymd.slice(0, 7);
 }
 
 function monthGermanLabel(ym) {
@@ -106,10 +106,10 @@ function fillUserSwitcher() {
 
 function fillMonthSelects() {
   const sels = [document.getElementById('monSel'), document.getElementById('lMonSel'), document.getElementById('teamMonSel')];
-  const now = new Date();
+  const [zy, zm] = IsoWeek.zonedYmd(new Date()).split('-').map(Number);
   const opts = [];
   for (let i = 0; i < 18; i += 1) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(zy, zm - 1 - i, 1);
     const v = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     opts.push({ v, label: monthGermanLabel(v) });
   }
@@ -186,7 +186,7 @@ function fmtD(s) {
 }
 
 function today() {
-  return new Date().toISOString().split('T')[0];
+  return IsoWeek.zonedYmd(new Date());
 }
 
 function eEmp(id, m = '') {
@@ -203,20 +203,12 @@ function teamProfileMonth() {
 }
 
 function wkDates() {
-  const t = new Date();
-  const mo = new Date(t);
-  mo.setDate(t.getDate() - ((t.getDay() + 6) % 7));
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(mo);
-    d.setDate(mo.getDate() + i);
-    return d.toISOString().split('T')[0];
-  });
+  return IsoWeek.datesInCurrentIsoWeek(new Date());
 }
 
 function kw(s) {
-  const d = new Date(s);
-  const st = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil(((d - st) / 86400000 + st.getDay() + 1) / 7);
+  const ymd = /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : IsoWeek.zonedYmd(new Date(s));
+  return IsoWeek.getISOWeekPartsFromYmd(ymd).week;
 }
 
 function syncSidebarFromCur() {
@@ -246,10 +238,12 @@ function switchUser(id) {
 }
 
 function tick() {
-  const n = new Date();
+  const ymd = IsoWeek.zonedYmd(new Date());
+  const [y, mo, d] = ymd.split('-').map(Number);
+  // Weekday for the Zurich civil date (UTC noon avoids DST edge cases)
+  const weekday = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0)).getUTCDay();
   const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-  const mos = MOS;
-  document.getElementById('topDate').textContent = `${days[n.getDay()]}, ${n.getDate()}. ${mos[n.getMonth() + 1]} ${n.getFullYear()}`;
+  document.getElementById('topDate').textContent = `${days[weekday]}, ${d}. ${MOS[mo]} ${y}`;
 }
 setInterval(tick, 30000);
 
@@ -305,40 +299,13 @@ function refreshView(n) {
   }
 }
 
-function getISOWeekParts(date = new Date()) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-  return { year: d.getUTCFullYear(), week };
-}
-
-function isoWeekBounds(year, week) {
-  const jan4 = new Date(Date.UTC(year, 0, 4));
-  const day = jan4.getUTCDay() || 7;
-  const mondayWeek1 = new Date(jan4);
-  mondayWeek1.setUTCDate(jan4.getUTCDate() - day + 1);
-  const monday = new Date(mondayWeek1);
-  monday.setUTCDate(mondayWeek1.getUTCDate() + (week - 1) * 7);
-  const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
-  const fmt = (dt) =>
-    `${String(dt.getUTCDate()).padStart(2, '0')}.${String(dt.getUTCMonth() + 1).padStart(2, '0')}.${dt.getUTCFullYear()}`;
-  return { fromLabel: fmt(monday), toLabel: fmt(sunday), monday, sunday };
-}
-
 function shiftReportWeek(delta) {
   if (reportYear == null || reportWeek == null) {
-    const cur = getISOWeekParts(new Date());
+    const cur = IsoWeek.getISOWeekParts(new Date());
     reportYear = cur.year;
     reportWeek = cur.week;
   }
-  const { monday } = isoWeekBounds(reportYear, reportWeek);
-  monday.setUTCDate(monday.getUTCDate() + delta * 7);
-  const next = getISOWeekParts(
-    new Date(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate())
-  );
+  const next = IsoWeek.shiftIsoWeek(reportYear, reportWeek, delta);
   reportYear = next.year;
   reportWeek = next.week;
   loadReports();
@@ -352,13 +319,13 @@ function formatReportHours(h) {
 async function loadReports() {
   if (!IS_ADMIN) return;
   if (reportYear == null || reportWeek == null) {
-    const cur = getISOWeekParts(new Date());
+    const cur = IsoWeek.getISOWeekParts(new Date());
     reportYear = cur.year;
     reportWeek = cur.week;
   }
   const body = document.getElementById('rpBody');
   const label = document.getElementById('rpWeekLabel');
-  const bounds = isoWeekBounds(reportYear, reportWeek);
+  const bounds = IsoWeek.isoWeekBounds(reportYear, reportWeek);
   if (label) {
     label.textContent = `KW ${reportWeek} · ${bounds.fromLabel}–${bounds.toLabel}`;
   }
@@ -369,7 +336,7 @@ async function loadReports() {
     const data = await api(`/reports?year=${reportYear}&week=${reportWeek}`);
     reportYear = data.year;
     reportWeek = data.week;
-    const b = isoWeekBounds(reportYear, reportWeek);
+    const b = IsoWeek.isoWeekBounds(reportYear, reportWeek);
     if (label) {
       label.textContent = `KW ${reportWeek} · ${b.fromLabel}–${b.toLabel}`;
     }
@@ -777,6 +744,7 @@ function renderMonat() {
 function renderDash() {
   const t = today();
   const m = currentMonthKey();
+  const monName = MOS[+m.split('-')[1]];
   const wk = wkDates();
   const act = EMPS.filter((e) => e.rate > 0 && ENTRIES.some((en) => en.empId === e.id && en.date === t)).length;
   const wkM = ENTRIES.filter((e) => wk.includes(e.date)).reduce((s, e) => s + net(e), 0);
@@ -785,10 +753,14 @@ function renderDash() {
   const lohn = EMPS.filter((e) => e.rate > 0).reduce((s, e) => s + totH(e.id, m) * e.rate, 0);
   document.getElementById('dAct').textContent = act;
   document.getElementById('dWk').textContent = mDur(wkM);
+  const dMonLbl = document.getElementById('dMonLbl');
+  const dLohnLbl = document.getElementById('dLohnLbl');
+  if (dMonLbl) dMonLbl.textContent = `Stunden ${monName}`;
+  if (dLohnLbl) dLohnLbl.textContent = `Lohnkosten ${monName}`;
   document.getElementById('dMon').textContent = `${(monM / 60).toFixed(0)}h`;
   document.getElementById('dMonSub').textContent = `von ${soll}h Soll`;
   document.getElementById('dLohn').textContent = `CHF ${Math.round(lohn).toLocaleString('de-CH')}.–`;
-  document.getElementById('dKW').textContent = kw(t);
+  document.getElementById('dKW').textContent = String(IsoWeek.getISOWeekPartsFromYmd(t).week);
 
   document.getElementById('dTeam').innerHTML = EMPS.filter((e) => e.rate > 0)
     .map((e) => {
@@ -1386,35 +1358,44 @@ async function quickDel(id) {
   }
 }
 
+function showEmpErr(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.style.display = 'block';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
+  }
+}
+
 function openAddEmp() {
   document.getElementById('eEmail').value = '';
-  document.getElementById('ePass').value = '';
   document.getElementById('eFirst').value = '';
   document.getElementById('eLast').value = '';
   document.getElementById('eRate').value = '35';
   document.getElementById('eTarget').value = '45';
+  showEmpErr('eEmpErr', '');
+  document.getElementById('moEmpForm').style.display = '';
+  document.getElementById('moEmpInviteResult').style.display = 'none';
   document.getElementById('moEmp').classList.add('open');
 }
 
 async function addEmp() {
+  showEmpErr('eEmpErr', '');
   const first = document.getElementById('eFirst').value.trim();
   const last = document.getElementById('eLast').value.trim();
   const email = document.getElementById('eEmail').value.trim();
-  const password = document.getElementById('ePass').value;
-  if (!first || !last || !email || !password) {
-    toast('Bitte E-Mail, Passwort, Vor- und Nachname eingeben.');
-    return;
-  }
-  if (password.length < 8) {
-    toast('Passwort mindestens 8 Zeichen.');
+  if (!first || !last || !email) {
+    showEmpErr('eEmpErr', 'Bitte E-Mail, Vor- und Nachname eingeben.');
     return;
   }
   try {
-    await api('/employees', {
+    const res = await api('/invitations', {
       method: 'POST',
       body: JSON.stringify({
         email,
-        password,
         firstName: first,
         lastName: last,
         jobTitle: document.getElementById('eRole').value,
@@ -1422,14 +1403,81 @@ async function addEmp() {
         weeklyHours: +document.getElementById('eTarget').value || 45,
       }),
     });
-    await loadData();
-    closeM('moEmp');
-    toast(`${first} ${last} hinzugefügt ✓`);
-    const ne = EMPS.find((x) => x.first === first && x.last === last);
-    if (ne && ne.rate > 0) teamSelEmpId = ne.id;
-    renderTeam();
+    const link = `${window.location.origin}/join.html?token=${encodeURIComponent(res.invitation.token)}`;
+    document.getElementById('eInviteLink').value = link;
+    document.getElementById('moEmpForm').style.display = 'none';
+    document.getElementById('moEmpInviteResult').style.display = '';
+    toast(`Einladung für ${first} ${last} erstellt`);
   } catch (e) {
-    toast(e.message);
+    showEmpErr('eEmpErr', e.message);
+  }
+}
+
+function copyInviteLink() {
+  const input = document.getElementById('eInviteLink');
+  if (!input || !input.value) return;
+  input.select();
+  navigator.clipboard.writeText(input.value).then(
+    () => toast('Link kopiert'),
+    () => {
+      try {
+        document.execCommand('copy');
+        toast('Link kopiert');
+      } catch {
+        toast('Link manuell kopieren');
+      }
+    }
+  );
+}
+
+function openEditEmp() {
+  const e = teamSelEmpId != null ? ge(teamSelEmpId) : null;
+  if (!e || !IS_ADMIN) return;
+  showEmpErr('editEmpErr', '');
+  document.getElementById('editFirst').value = e.first;
+  document.getElementById('editLast').value = e.last;
+  const roleSel = document.getElementById('editRole');
+  const opts = [...roleSel.options].map((o) => o.value);
+  if (e.role && !opts.includes(e.role)) {
+    const opt = document.createElement('option');
+    opt.value = e.role;
+    opt.textContent = e.role;
+    roleSel.appendChild(opt);
+  }
+  roleSel.value = e.role || 'Mitarbeiter';
+  document.getElementById('editRate').value = String(e.rate);
+  document.getElementById('editTarget').value = String(e.target);
+  document.getElementById('moEditEmp').classList.add('open');
+}
+
+async function saveEditEmp() {
+  showEmpErr('editEmpErr', '');
+  const e = teamSelEmpId != null ? ge(teamSelEmpId) : null;
+  if (!e) return;
+  const firstName = document.getElementById('editFirst').value.trim();
+  const lastName = document.getElementById('editLast').value.trim();
+  const jobTitle = document.getElementById('editRole').value;
+  const hourlyRate = +document.getElementById('editRate').value;
+  const weeklyHours = +document.getElementById('editTarget').value;
+  if (!firstName || !lastName) {
+    showEmpErr('editEmpErr', 'Vor- und Nachname sind erforderlich.');
+    return;
+  }
+  if (!(hourlyRate >= 0) || !(weeklyHours >= 1 && weeklyHours <= 60)) {
+    showEmpErr('editEmpErr', 'Bitte gültigen Stundenlohn und Soll-Stunden prüfen.');
+    return;
+  }
+  try {
+    await api(`/employees/${e.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ firstName, lastName, jobTitle, hourlyRate, weeklyHours }),
+    });
+    await loadData();
+    closeM('moEditEmp');
+    toast('Mitarbeiter aktualisiert ✓');
+    renderTeam();
+  } catch (err) {
+    showEmpErr('editEmpErr', err.message);
   }
 }
 

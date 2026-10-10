@@ -516,13 +516,13 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         </div>
         <div class="stat-card">
           <div class="stat-accent" style="background:var(--blue);"></div>
-          <div class="stat-lbl">Stunden März</div>
+          <div class="stat-lbl" id="dMonLbl">Stunden</div>
           <div class="stat-val" id="dMon">—</div>
           <div class="stat-sub" id="dMonSub">von Soll</div>
         </div>
         <div class="stat-card">
           <div class="stat-accent" style="background:var(--yellow);"></div>
-          <div class="stat-lbl">Lohnkosten März</div>
+          <div class="stat-lbl" id="dLohnLbl">Lohnkosten</div>
           <div class="stat-val" style="font-size:21px;" id="dLohn">—</div>
           <div class="stat-sub">Brutto geschätzt</div>
         </div>
@@ -552,7 +552,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         <div style="flex:1;"></div>
         <button class="btn btn-p" onclick="openAddEmp()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Mitarbeiter hinzufügen
+          Mitarbeiter einladen
         </button>
       </div>
       <div class="team-page-layout">
@@ -592,6 +592,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Letzte Einträge</div>
             <div id="teamProfEntries" class="team-prof-entries"></div>
             <div class="team-prof-actions">
+              <button type="button" class="btn btn-g" style="width:100%;justify-content:center;margin-bottom:8px;" onclick="openEditEmp()">Bearbeiten</button>
               <button type="button" class="btn btn-d" style="width:100%;justify-content:center;" onclick="deleteTeamEmployee()">Mitarbeiter löschen</button>
               <p class="team-prof-del-hint">Löscht das Konto und alle Zeiteinträge dieser Person (nicht rückgängig).</p>
             </div>
@@ -833,35 +834,80 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   </div>
 </div>
 
-<!-- MODAL: MITARBEITER -->
+<!-- MODAL: MITARBEITER EINLADEN -->
 <div class="mo" id="moEmp">
   <div class="mo-box">
-    <div class="mo-title">Mitarbeiter hinzufügen</div>
-    <div class="mo-sub">Neuer Mitarbeiter im Saniga-Team.</div>
-    <div class="form-row" style="margin-bottom:14px;">
-      <div class="fg"><label>E-Mail (Login)</label><input type="email" id="eEmail" placeholder="mitarbeiter@firma.ch" autocomplete="off"></div>
-      <div class="fg"><label>Passwort</label><input type="password" id="ePass" placeholder="mind. 8 Zeichen" autocomplete="new-password"></div>
+    <div id="moEmpForm">
+      <div class="mo-title">Mitarbeiter einladen</div>
+      <div class="mo-sub">Es wird ein Einladungslink erstellt. Der Mitarbeiter setzt selbst ein Passwort.</div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>E-Mail (Login)</label>
+        <input type="email" id="eEmail" placeholder="mitarbeiter@firma.ch" autocomplete="off">
+      </div>
+      <div class="form-row" style="margin-bottom:14px;">
+        <div class="fg"><label>Vorname</label><input type="text" id="eFirst" placeholder="Marco"></div>
+        <div class="fg"><label>Nachname</label><input type="text" id="eLast" placeholder="Huber"></div>
+      </div>
+      <div class="form-row" style="margin-bottom:14px;">
+        <div class="fg"><label>Funktion</label>
+          <select id="eRole">
+            <option>Monteur Sanitär</option><option>Monteur Heizung</option>
+            <option>Monteur Lüftung</option><option>Lehrling</option><option>Mitarbeiter</option>
+          </select>
+        </div>
+        <div class="fg"><label>Stundenlohn (CHF)</label><input type="number" id="eRate" value="35" min="0" step="0.5"></div>
+      </div>
+      <div class="fg" style="margin-bottom:14px;max-width:50%;">
+        <label>Soll-Stunden/Woche</label>
+        <input type="number" id="eTarget" value="45" min="1" max="60">
+      </div>
+      <p id="eEmpErr" style="color:var(--red);font-size:13px;margin:0 0 12px;display:none;"></p>
+      <div class="mo-actions">
+        <button class="btn btn-g" onclick="closeM('moEmp')">Abbrechen</button>
+        <button class="btn btn-p" onclick="addEmp()">Einladung erstellen</button>
+      </div>
     </div>
+    <div id="moEmpInviteResult" style="display:none;">
+      <div class="mo-title">Einladungslink bereit</div>
+      <div class="mo-sub">Diesen Link an den Mitarbeiter senden. Gültig 14 Tage, einmalig nutzbar.</div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Link</label>
+        <input type="text" id="eInviteLink" readonly onclick="this.select()">
+      </div>
+      <div class="mo-actions">
+        <button class="btn btn-g" onclick="copyInviteLink()">Link kopieren</button>
+        <button class="btn btn-p" onclick="closeM('moEmp')">Fertig</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MITARBEITER BEARBEITEN -->
+<div class="mo" id="moEditEmp">
+  <div class="mo-box">
+    <div class="mo-title">Mitarbeiter bearbeiten</div>
+    <div class="mo-sub">E-Mail und Rolle können hier nicht geändert werden.</div>
     <div class="form-row" style="margin-bottom:14px;">
-      <div class="fg"><label>Vorname</label><input type="text" id="eFirst" placeholder="Marco"></div>
-      <div class="fg"><label>Nachname</label><input type="text"  id="eLast"  placeholder="Huber"></div>
+      <div class="fg"><label>Vorname</label><input type="text" id="editFirst"></div>
+      <div class="fg"><label>Nachname</label><input type="text" id="editLast"></div>
     </div>
     <div class="form-row" style="margin-bottom:14px;">
       <div class="fg"><label>Funktion</label>
-        <select id="eRole">
+        <select id="editRole">
           <option>Monteur Sanitär</option><option>Monteur Heizung</option>
-          <option>Monteur Lüftung</option><option>Lehrling</option>
+          <option>Monteur Lüftung</option><option>Lehrling</option><option>Mitarbeiter</option>
         </select>
       </div>
-      <div class="fg"><label>Stundenlohn (CHF)</label><input type="number" id="eRate" value="35"></div>
+      <div class="fg"><label>Stundenlohn (CHF)</label><input type="number" id="editRate" min="0" step="0.5"></div>
     </div>
-    <div class="form-row">
-      <div class="fg"><label>Soll-Stunden/Woche</label><input type="number" id="eTarget" value="45"></div>
-      <div class="fg"><label>Eintrittsdatum</label><input type="date" id="eStart" value="2026-03-28"></div>
+    <div class="fg" style="margin-bottom:14px;max-width:50%;">
+      <label>Soll-Stunden/Woche</label>
+      <input type="number" id="editTarget" min="1" max="60">
     </div>
+    <p id="editEmpErr" style="color:var(--red);font-size:13px;margin:0 0 12px;display:none;"></p>
     <div class="mo-actions">
-      <button class="btn btn-g" onclick="closeM('moEmp')">Abbrechen</button>
-      <button class="btn btn-p" onclick="addEmp()">Hinzufügen</button>
+      <button class="btn btn-g" onclick="closeM('moEditEmp')">Abbrechen</button>
+      <button class="btn btn-p" onclick="saveEditEmp()">Speichern</button>
     </div>
   </div>
 </div>
@@ -872,6 +918,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   <span id="toastMsg"></span>
 </div>
 
+<script src="/iso-week.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

@@ -20,6 +20,8 @@ const createSchema = z.object({
 });
 
 const patchSchema = z.object({
+  firstName: z.string().min(1).max(80).optional(),
+  lastName: z.string().min(1).max(80).optional(),
   jobTitle: z.string().max(120).optional(),
   hourlyRate: z.coerce.number().min(0).max(500).optional(),
   weeklyHours: z.coerce.number().int().min(1).max(60).optional(),
@@ -75,7 +77,9 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     return res.status(404).json({ error: 'Mitarbeiter nicht gefunden' });
   }
   const data = {};
-  if (parsed.data.jobTitle !== undefined) data.jobTitle = parsed.data.jobTitle;
+  if (parsed.data.firstName !== undefined) data.firstName = parsed.data.firstName.trim();
+  if (parsed.data.lastName !== undefined) data.lastName = parsed.data.lastName.trim();
+  if (parsed.data.jobTitle !== undefined) data.jobTitle = parsed.data.jobTitle.trim();
   if (parsed.data.hourlyRate !== undefined) data.hourlyRate = parsed.data.hourlyRate;
   if (parsed.data.weeklyHours !== undefined) data.weeklyHours = parsed.data.weeklyHours;
   if (parsed.data.avatarColor !== undefined) data.avatarColor = parsed.data.avatarColor;

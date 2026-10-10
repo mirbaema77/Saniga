@@ -2,42 +2,9 @@ const express = require('express');
 const { z } = require('zod');
 const { prisma } = require('../lib/prisma');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const IsoWeek = require('../../public/iso-week');
 
 const router = express.Router();
-
-function pad2(n) {
-  return String(n).padStart(2, '0');
-}
-
-function formatYmd(d) {
-  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
-}
-
-/** ISO week number + ISO week-year for a local/UTC calendar date. */
-function getISOWeekParts(date = new Date()) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-  return { year: d.getUTCFullYear(), week };
-}
-
-/** Monday–Sunday (UTC dates) for an ISO week. */
-function isoWeekBounds(year, week) {
-  const jan4 = new Date(Date.UTC(year, 0, 4));
-  const day = jan4.getUTCDay() || 7;
-  const mondayWeek1 = new Date(jan4);
-  mondayWeek1.setUTCDate(jan4.getUTCDate() - day + 1);
-  const monday = new Date(mondayWeek1);
-  monday.setUTCDate(mondayWeek1.getUTCDate() + (week - 1) * 7);
-  const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
-  return {
-    from: formatYmd(monday),
-    to: formatYmd(sunday),
-  };
-}
 
 function entryHours(e) {
   if (e.hours != null) return Number(e.hours);
@@ -57,10 +24,10 @@ router.get('/', async (req, res) => {
     return res.status(400).json({ error: 'Ungültige Eingabe', details: parsed.error.flatten() });
   }
 
-  const current = getISOWeekParts(new Date());
+  const current = IsoWeek.getISOWeekParts(new Date());
   const year = parsed.data.year ?? current.year;
   const week = parsed.data.week ?? current.week;
-  const { from, to } = isoWeekBounds(year, week);
+  const { from, to } = IsoWeek.isoWeekBounds(year, week);
 
   const rows = await prisma.timeEntry.findMany({
     where: {

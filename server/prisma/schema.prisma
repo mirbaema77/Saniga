@@ -76,3 +76,17 @@ model WorkType {
   active   Boolean     @default(true)
   entries  TimeEntry[]
 }
+
+model Invitation {
+  id         String    @id @default(cuid())
+  token      String    @unique
+  email      String
+  firstName  String
+  lastName   String
+  jobTitle   String    @default("Mitarbeiter")
+  hourlyRate Decimal   @default(35) @db.Decimal(10, 2)
+  weeklyHours Int      @default(45)
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  usedAt     DateTime?
+}

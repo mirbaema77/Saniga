@@ -2,7 +2,6 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Registrieren – Saniga Zeiterfassung</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
@@ -33,6 +32,7 @@ input, select {
   font-size: 14px; font-family: inherit; width: 100%;
 }
 input:focus, select:focus { outline: none; border-color: var(--saniga-red); box-shadow: 0 0 0 3px rgba(18,184,225,.15); }
+input[readonly] { background: #f3f7f9; color: var(--t2); }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -44,11 +44,44 @@ input:focus, select:focus { outline: none; border-color: var(--saniga-red); box-
 .err { color: #dc2626; font-size: 13px; margin-top: 12px; display: none; }
 .back { text-align: center; margin-top: 18px; }
 .back a { color: var(--saniga-red); font-weight: 600; text-decoration: none; font-size: 13px; }
+.hidden { display: none !important; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="card">
+  <!-- Token-based invitation accept -->
+  <div class="card hidden" id="panelToken">
+    <h1>Passwort festlegen</h1>
+    <p class="sub">Sie wurden eingeladen. Legen Sie ein Passwort fest, um Ihr Konto zu aktivieren.</p>
+    <div class="row2">
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Vorname</label>
+        <input type="text" id="tokFirst" readonly>
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Nachname</label>
+        <input type="text" id="tokLast" readonly>
+      </div>
+    </div>
+    <div class="fg">
+      <label>E-Mail</label>
+      <input type="email" id="tokEmail" readonly>
+    </div>
+    <div class="fg">
+      <label>Passwort (mind. 8 Zeichen)</label>
+      <input type="password" id="tokPass" autocomplete="new-password" placeholder="••••••••">
+    </div>
+    <div class="fg">
+      <label>Passwort wiederholen</label>
+      <input type="password" id="tokPass2" autocomplete="new-password" placeholder="••••••••">
+    </div>
+    <button type="button" class="btn" id="tokBtn">Konto aktivieren</button>
+    <p class="err" id="tokErr"></p>
+    <div class="back"><a href="/">Zurück zur Anmeldung</a></div>
+  </div>
+
+  <!-- Shared invite-code registration (legacy) -->
+  <div class="card" id="panelCode">
     <h1>Konto erstellen</h1>
     <p class="sub">Geben Sie den Einladungscode ein, den Sie von der Geschäftsleitung erhalten haben. Anschliessend können Sie Ihre Arbeitszeiten erfassen.</p>
     <div class="fg">
@@ -90,10 +123,66 @@ input:focus, select:focus { outline: none; border-color: var(--saniga-red); box-
 </div>
 <script>
 const TOKEN_KEY = 'saniga_token';
+const params = new URLSearchParams(window.location.search);
+const inviteToken = params.get('token');
+
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.style.display = 'block';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
+  }
+}
+
+async function initTokenFlow() {
+  document.getElementById('panelCode').classList.add('hidden');
+  document.getElementById('panelToken').classList.remove('hidden');
+  try {
+    const r = await fetch('/api/invitations/' + encodeURIComponent(inviteToken));
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'Einladung ungültig');
+    document.getElementById('tokFirst').value = data.invitation.firstName || '';
+    document.getElementById('tokLast').value = data.invitation.lastName || '';
+    document.getElementById('tokEmail').value = data.invitation.email || '';
+  } catch (e) {
+    showErr('tokErr', e.message);
+    document.getElementById('tokBtn').disabled = true;
+  }
+}
+
+document.getElementById('tokBtn').addEventListener('click', async () => {
+  showErr('tokErr', '');
+  const password = document.getElementById('tokPass').value;
+  const password2 = document.getElementById('tokPass2').value;
+  if (password.length < 8) {
+    showErr('tokErr', 'Passwort mindestens 8 Zeichen.');
+    return;
+  }
+  if (password !== password2) {
+    showErr('tokErr', 'Passwörter stimmen nicht überein.');
+    return;
+  }
+  try {
+    const r = await fetch('/api/invitations/' + encodeURIComponent(inviteToken) + '/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'Aktivierung fehlgeschlagen');
+    localStorage.setItem(TOKEN_KEY, data.token);
+    window.location.href = '/';
+  } catch (e) {
+    showErr('tokErr', e.message);
+  }
+});
 
 document.getElementById('regBtn').addEventListener('click', async () => {
-  const err = document.getElementById('err');
-  err.style.display = 'none';
+  showErr('err', '');
   const body = {
     inviteCode: document.getElementById('inviteCode').value.trim(),
     email: document.getElementById('email').value.trim(),
@@ -113,10 +202,13 @@ document.getElementById('regBtn').addEventListener('click', async () => {
     localStorage.setItem(TOKEN_KEY, data.token);
     window.location.href = '/';
   } catch (e) {
-    err.textContent = e.message;
-    err.style.display = 'block';
+    showErr('err', e.message);
   }
 });
+
+if (inviteToken) {
+  initTokenFlow();
+}
 </script>
 </body>
 </html>
