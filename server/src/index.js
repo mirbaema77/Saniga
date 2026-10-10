@@ -17,6 +17,7 @@ const sitesRoutes = require('./routes/sites');
 const workTypesRoutes = require('./routes/workTypes');
 const reportsRoutes = require('./routes/reports');
 const invitationsRoutes = require('./routes/invitations');
+const invoicesRoutes = require('./routes/invoices');
 
 const app = express();
 const PORT = Number(process.env.PORT, 10) || 3000;
@@ -52,6 +53,7 @@ app.use('/api/sites', sitesRoutes);
 app.use('/api/work-types', workTypesRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/invitations', invitationsRoutes);
+app.use('/api/invoices', invoicesRoutes);
 
 app.use(
   express.static(publicDir, {

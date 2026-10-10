@@ -274,6 +274,17 @@ function mDur(m) {
   return m % 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${Math.floor(m / 60)}h`;
 }
 
+/** Shared hour display for dashboard + reports: one decimal, German comma, "h" suffix. */
+function formatHours(hours) {
+  const n = Number(hours);
+  if (!Number.isFinite(n)) return '0,0 h';
+  return `${n.toFixed(1).replace('.', ',')} h`;
+}
+
+function formatHoursFromMinutes(mins) {
+  return formatHours((Number(mins) || 0) / 60);
+}
+
 function fmtD(s) {
   const [y, mo, d] = s.split('-');
   return `${d}.${mo}.${y}`;
@@ -400,8 +411,7 @@ function shiftReportWeek(delta) {
 }
 
 function formatReportHours(h) {
-  const n = Number(h) || 0;
-  return `${n % 1 ? n.toFixed(1) : n}h`;
+  return formatHours(h);
 }
 
 async function loadReports() {
@@ -448,21 +458,41 @@ function renderReports(data) {
     .map((c) => {
       const sitesHtml = (c.sites || [])
         .map((s) => {
-          const rows = (s.entries || [])
-            .map(
-              (en) => `<tr>
-              <td>${escapeAttr(fmtD(en.date))}</td>
+          const entries = s.entries || [];
+          const allInvoiced = entries.length > 0 && entries.every((en) => en.invoiceId || en.invoiceNumber);
+          const invoiceNumbers = [
+            ...new Set(entries.map((en) => en.invoiceNumber).filter(Boolean)),
+          ];
+          const rows = entries
+            .map((en) => {
+              const invoiced = !!(en.invoiceId || en.invoiceNumber);
+              const invBadge = en.invoiceNumber
+                ? `<span class="rp-inv-badge">${escapeAttr(en.invoiceNumber)}</span>`
+                : '';
+              return `<tr class="${invoiced ? 'rp-entry-invoiced' : ''}">
+              <td>${escapeAttr(fmtD(en.date))}${invBadge}</td>
               <td>${escapeAttr(en.employeeName)}</td>
               <td>${escapeAttr(en.workType)}</td>
               <td class="mono">${escapeAttr(formatReportHours(en.hours))}</td>
               <td style="color:var(--t2);">${escapeAttr(en.note || '—')}</td>
-            </tr>`
-            )
+            </tr>`;
+            })
             .join('');
-          return `<div class="rp-site">
+          const invStatus = invoiceNumbers.length
+            ? `<span class="rp-inv-status" data-rp-inv-status>${invoiceNumbers.map((n) => escapeAttr(n)).join(', ')}</span>`
+            : `<span class="rp-inv-status" data-rp-inv-status></span>`;
+          const createBtn = allInvoiced
+            ? ''
+            : `<button type="button" class="btn btn-g" data-rp-create-inv onclick="createReportInvoice('${escapeAttr(s.id)}')">Rechnung erstellen</button>`;
+          return `<div class="rp-site" data-site-id="${escapeAttr(s.id)}">
             <div class="rp-site-head">
               <div class="rp-site-label">${escapeAttr(s.label)}</div>
               <div class="rp-site-total">${escapeAttr(formatReportHours(s.totalHours))} Total</div>
+              <div class="rp-site-actions">
+                ${invStatus}
+                ${createBtn}
+                <span class="rp-inv-msg" data-rp-inv-msg></span>
+              </div>
             </div>
             <table>
               <thead><tr><th>Datum</th><th>Mitarbeiter</th><th>Arbeit</th><th>Stunden</th><th>Bemerkung</th></tr></thead>
@@ -480,6 +510,87 @@ function renderReports(data) {
       </div>`;
     })
     .join('');
+}
+
+function reportSiteBlock(siteId) {
+  return document.querySelector(`.rp-site[data-site-id="${siteId}"]`);
+}
+
+function setReportInvoiceMessage(siteId, msg, isErr) {
+  const block = reportSiteBlock(siteId);
+  if (!block) return;
+  const el = block.querySelector('[data-rp-inv-msg]');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.classList.toggle('err', !!isErr);
+}
+
+async function openInvoicePdf(invoiceId) {
+  const t = localStorage.getItem(TOKEN_KEY);
+  const r = await fetch(`/api/invoices/${invoiceId}/pdf`, {
+    headers: t ? { Authorization: `Bearer ${t}` } : {},
+  });
+  if (!r.ok) {
+    let msg = 'PDF konnte nicht geladen werden';
+    try {
+      const data = await r.json();
+      if (data.error) msg = data.error;
+    } catch {
+      /* keep default */
+    }
+    throw new Error(msg);
+  }
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener');
+}
+
+async function createReportInvoice(siteId) {
+  if (!IS_ADMIN) return;
+  if (reportYear == null || reportWeek == null) return;
+  setReportInvoiceMessage(siteId, '', false);
+  const block = reportSiteBlock(siteId);
+  const btn = block?.querySelector('[data-rp-create-inv]');
+  if (btn) btn.disabled = true;
+  try {
+    const t = localStorage.getItem(TOKEN_KEY);
+    const r = await fetch('/api/invoices', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(t ? { Authorization: `Bearer ${t}` } : {}),
+      },
+      body: JSON.stringify({ siteId, year: reportYear, week: reportWeek }),
+    });
+    const text = await r.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { error: text || 'Ungültige Antwort' };
+    }
+    if (r.status === 409) {
+      setReportInvoiceMessage(siteId, 'Für diese Woche sind keine offenen Stunden vorhanden.', true);
+      return;
+    }
+    if (!r.ok) {
+      throw new Error(data.error || `HTTP ${r.status}`);
+    }
+    const invoice = data.invoice;
+    if (invoice?.number) {
+      const status = block?.querySelector('[data-rp-inv-status]');
+      if (status) status.textContent = invoice.number;
+      setReportInvoiceMessage(siteId, `Rechnung ${invoice.number}`, false);
+    }
+    if (invoice?.id) {
+      await openInvoicePdf(invoice.id);
+    }
+    await loadReports();
+  } catch (e) {
+    setReportInvoiceMessage(siteId, e.message || 'Rechnung fehlgeschlagen', true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 function showSdErr(id, msg) {
@@ -840,13 +951,13 @@ function renderDash() {
   const soll = EMPS.filter((e) => e.rate > 0).reduce((s, e) => s + e.target * 4, 0);
   const lohn = EMPS.filter((e) => e.rate > 0).reduce((s, e) => s + totH(e.id, m) * e.rate, 0);
   document.getElementById('dAct').textContent = act;
-  document.getElementById('dWk').textContent = mDur(wkM);
+  document.getElementById('dWk').textContent = formatHoursFromMinutes(wkM);
   const dMonLbl = document.getElementById('dMonLbl');
   const dLohnLbl = document.getElementById('dLohnLbl');
   if (dMonLbl) dMonLbl.textContent = `Stunden ${monName}`;
   if (dLohnLbl) dLohnLbl.textContent = `Lohnkosten ${monName}`;
-  document.getElementById('dMon').textContent = `${(monM / 60).toFixed(0)}h`;
-  document.getElementById('dMonSub').textContent = `von ${soll}h Soll`;
+  document.getElementById('dMon').textContent = formatHoursFromMinutes(monM);
+  document.getElementById('dMonSub').textContent = `von ${formatHours(soll)} Soll`;
   document.getElementById('dLohn').textContent = `CHF ${Math.round(lohn).toLocaleString('de-CH')}.–`;
   document.getElementById('dKW').textContent = String(IsoWeek.getISOWeekPartsFromYmd(t).week);
 
@@ -858,7 +969,7 @@ function renderDash() {
       <div style="width:32px;height:32px;border-radius:50%;background:${e.color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0;">${ini(e)}</div>
       <div style="flex:1;font-size:13.5px;font-weight:500;">${e.first} ${e.last}</div>
       <div style="font-size:12px;color:var(--t3);margin-right:10px;">${e.role}</div>
-      <span class="badge ${ok ? 'bg' : 'br'}"><span class="bdot"></span>${ok ? mDur(tM) : 'Kein Eintrag'}</span>
+      <span class="badge ${ok ? 'bg' : 'br'}"><span class="bdot"></span>${ok ? formatHoursFromMinutes(tM) : 'Kein Eintrag'}</span>
     </div>`;
     })
     .join('');
@@ -871,7 +982,7 @@ function renderDash() {
       return `<div>
       <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
         <span style="font-size:13px;font-weight:500;">${e.first} ${e.last}</span>
-        <span class="mono" style="font-size:12px;color:var(--t2);">${hrs.toFixed(1)} / ${e.target}h</span>
+        <span class="mono" style="font-size:12px;color:var(--t2);">${formatHours(hrs)} / ${formatHours(e.target)}</span>
       </div>
       <div class="pb"><div class="pf" style="width:${pct}%;background:${col};"></div></div>
     </div>`;

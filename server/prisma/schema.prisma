@@ -44,18 +44,22 @@ model TimeEntry {
   workTypeId   String?
   workType     WorkType? @relation(fields: [workTypeId], references: [id])
   hours        Decimal?  @db.Decimal(5, 2)
+  invoiceId    String?
+  invoice      Invoice?  @relation(fields: [invoiceId], references: [id])
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   @@index([userId, date])
+  @@index([invoiceId])
 }
 
 model Customer {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
   address   String?
   sites     Site[]
-  createdAt DateTime @default(now())
+  invoices  Invoice[]
+  createdAt DateTime  @default(now())
 }
 
 model Site {
@@ -67,6 +71,7 @@ model Site {
   active     Boolean     @default(true)
   createdAt  DateTime    @default(now())
   entries    TimeEntry[]
+  invoices   Invoice[]
 }
 
 model WorkType {
@@ -78,15 +83,30 @@ model WorkType {
 }
 
 model Invitation {
-  id         String    @id @default(cuid())
-  token      String    @unique
-  email      String
-  firstName  String
-  lastName   String
-  jobTitle   String    @default("Mitarbeiter")
-  hourlyRate Decimal   @default(35) @db.Decimal(10, 2)
-  weeklyHours Int      @default(45)
-  createdAt  DateTime  @default(now())
-  expiresAt  DateTime
-  usedAt     DateTime?
+  id          String    @id @default(cuid())
+  token       String    @unique
+  email       String
+  firstName   String
+  lastName    String
+  jobTitle    String    @default("Mitarbeiter")
+  hourlyRate  Decimal   @default(35) @db.Decimal(10, 2)
+  weeklyHours Int       @default(45)
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  usedAt      DateTime?
+}
+
+model Invoice {
+  id         String      @id @default(cuid())
+  number     String      @unique
+  customerId String
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  siteId     String
+  site       Site        @relation(fields: [siteId], references: [id])
+  issueDate  DateTime
+  periodFrom DateTime
+  periodTo   DateTime
+  vatRate    Decimal     @db.Decimal(4, 2)
+  entries    TimeEntry[]
+  createdAt  DateTime    @default(now())
 }

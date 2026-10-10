@@ -38,6 +38,7 @@ router.get('/', async (req, res) => {
       user: { select: { firstName: true, lastName: true } },
       site: { include: { customer: true } },
       workType: { select: { label: true } },
+      invoice: { select: { id: true, number: true } },
     },
     orderBy: [{ date: 'asc' }, { createdAt: 'asc' }],
   });
@@ -54,6 +55,8 @@ router.get('/', async (req, res) => {
       workType: e.workType?.label || '—',
       hours,
       note: e.note || '',
+      invoiceId: e.invoiceId || null,
+      invoiceNumber: e.invoice?.number || null,
     };
 
     if (!byCustomer.has(customer.id)) {
