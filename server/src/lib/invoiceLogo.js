@@ -11,7 +11,8 @@ const MARGIN_X = 20 * MM;
 const MARGIN_TOP = 15 * MM;
 const MARGIN_RIGHT = 15 * MM;
 const LOGO_W = 55 * MM;
-const LOGO_H = LOGO_W * (40 / 210);
+/** Matches server/assets/logo-saniga.png aspect (370×100 @ ~3x SVG). */
+const LOGO_H = LOGO_W * (100 / 370);
 const RECIPIENT_LEFT = PAGE_W * 0.55;
 
 function loadLogoPng() {

@@ -112,6 +112,51 @@ function formatVatRate(rate) {
   return Number.isInteger(n) ? String(n) : String(n);
 }
 
+/**
+ * Split customer address into street + "PLZ Ort" for the 3-line recipient block.
+ * Accepts newline-separated address or a single line with Swiss postcode.
+ */
+function parseAddressParts(address) {
+  const raw = String(address || '').trim();
+  if (!raw) return { street: '', cityLine: '' };
+
+  const lines = raw
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (lines.length >= 2) {
+    return { street: lines[0], cityLine: lines.slice(1).join(' ') };
+  }
+
+  const single = lines[0] || '';
+  const m =
+    single.match(/^(.+?),?\s+(\d{4}\s+.+)$/) ||
+    single.match(/^(.+?)\s+(\d{4}\s+.+)$/);
+  if (m) {
+    return { street: m[1].trim(), cityLine: m[2].trim() };
+  }
+  return { street: single, cityLine: '' };
+}
+
+/** Company name, street, postcode+city — always three slots for the recipient block. */
+function buildRecipientLines(customer) {
+  const name = (customer?.name || '').trim();
+  const { street, cityLine } = parseAddressParts(customer?.address);
+  return [name, street, cityLine];
+}
+
+/** First/last YYYY-MM-DD among entries that contribute hours. */
+function workDateBounds(entries) {
+  const dates = (entries || [])
+    .filter((e) => entryHours(e) > 0)
+    .map((e) => e.date)
+    .filter(Boolean)
+    .sort();
+  if (!dates.length) return { from: null, to: null };
+  return { from: dates[0], to: dates[dates.length - 1] };
+}
+
 /** Shared presentation model for PDF and Word renderers. */
 function buildInvoiceView(invoice) {
   const lineItems = buildLineItems(invoice.entries || []);
@@ -120,12 +165,15 @@ function buildInvoiceView(invoice) {
   const siteLabel = invoice.site?.label || '';
   const periodFromLabel = formatDeDate(invoice.periodFrom, { utc: true });
   const periodToLabel = formatDeDate(invoice.periodTo, { utc: true });
+  const recipientLines = buildRecipientLines(invoice.customer);
   return {
     number: invoice.number,
-    customerName: invoice.customer?.name || '',
+    customerName: recipientLines[0] || '',
     customerAddress: invoice.customer?.address || '',
+    recipientLines,
     siteLabel,
-    issueDateLabel: formatDeDate(invoice.issueDate),
+    // issueDate is stored as the last work day (UTC calendar date)
+    issueDateLabel: formatDeDate(invoice.issueDate, { utc: true }),
     periodFromLabel,
     periodToLabel,
     vatRate,
@@ -135,7 +183,7 @@ function buildInvoiceView(invoice) {
       { label: 'MWST.-Nr.', value: 'CHE-298.414.455' },
       { label: 'Objekt-Liegenschaft', value: siteLabel },
       { label: 'Objekt-Nr.', value: '' },
-      { label: 'Arbeitsgattung', value: '"BKP 250 Sanitäranlagen"' },
+      { label: 'Arbeitsgattung', value: 'BKP 250 Sanitäranlagen' },
       { label: 'Ausführungsdatum', value: `${periodFromLabel} – ${periodToLabel}` },
     ],
     footerLines: [
@@ -160,5 +208,8 @@ module.exports = {
   totalsFromLines,
   formatDeDate,
   formatVatRate,
+  parseAddressParts,
+  buildRecipientLines,
+  workDateBounds,
   buildInvoiceView,
 };

@@ -16,6 +16,13 @@ const {
   loadLogoPng,
 } = require('./invoiceLogo');
 
+function paintWhitePage(doc) {
+  const { width, height } = doc.page;
+  doc.save();
+  doc.rect(0, 0, width, height).fill('#FFFFFF');
+  doc.restore();
+}
+
 /**
  * @returns {Promise<Buffer>}
  */
@@ -27,35 +34,40 @@ function renderInvoicePdf(invoice) {
     const doc = new PDFDocument({
       size: 'A4',
       margin: 0,
+      autoFirstPage: true,
     });
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
+    paintWhitePage(doc);
+
     const pageWidth = doc.page.width;
     const pageHeight = doc.page.height;
     const contentRight = pageWidth - MARGIN_RIGHT;
     const contentWidth = contentRight - MARGIN_X;
+
+    const ensureSpace = (needY) => {
+      if (needY <= pageHeight - 20 * MM) return;
+      doc.addPage();
+      paintWhitePage(doc);
+      return true;
+    };
 
     // Logo top-right: 55mm wide, 15mm from top and right edges
     const logoX = pageWidth - MARGIN_RIGHT - LOGO_W;
     const logoY = MARGIN_TOP;
     doc.image(logo, logoX, logoY, { width: LOGO_W, height: LOGO_H });
 
-    // Recipient below logo, right-aligned, left edge ~55% page width
+    // Recipient: 3 lines (name, street, PLZ Ort), right-aligned from ~55% width
     const recipientLeft = RECIPIENT_LEFT;
     const recipientWidth = contentRight - recipientLeft;
     let y = logoY + LOGO_H + 10 * MM;
 
     doc.font('Helvetica').fontSize(10).fillColor('#152830');
-    doc.text(view.customerName || '', recipientLeft, y, {
-      width: recipientWidth,
-      align: 'right',
-    });
-    y = doc.y;
-    if (view.customerAddress) {
-      doc.fillColor('#2a4a55').text(String(view.customerAddress), recipientLeft, y, {
+    for (const line of view.recipientLines) {
+      doc.text(line || ' ', recipientLeft, y, {
         width: recipientWidth,
         align: 'right',
       });
@@ -96,7 +108,6 @@ function renderInvoicePdf(invoice) {
 
     y += 8 * MM;
 
-    // Line-item table columns
     const colArbeit = MARGIN_X;
     const colMenge = MARGIN_X + contentWidth * 0.52;
     const colPreis = MARGIN_X + contentWidth * 0.68;
@@ -105,7 +116,6 @@ function renderInvoicePdf(invoice) {
     const preisW = colTotal - colPreis - 4;
     const totalW = contentRight - colTotal;
 
-    // Top rule
     doc
       .moveTo(MARGIN_X, y)
       .lineTo(contentRight, y)
@@ -123,20 +133,14 @@ function renderInvoicePdf(invoice) {
 
     doc.font('Helvetica').fontSize(10);
     for (const group of view.lineItems) {
-      if (y > pageHeight - 70 * MM) {
-        doc.addPage();
-        y = MARGIN_TOP;
-      }
+      if (ensureSpace(y + 40)) y = MARGIN_TOP;
       doc.font('Helvetica-Bold').fillColor('#152830').text(`${group.workTypeLabel}:`, colArbeit, y, {
         width: colMenge - colArbeit - 6,
       });
       y = doc.y + 4;
       doc.font('Helvetica').fillColor('#152830');
       for (const emp of group.employees) {
-        if (y > pageHeight - 70 * MM) {
-          doc.addPage();
-          y = MARGIN_TOP;
-        }
+        if (ensureSpace(y + 20)) y = MARGIN_TOP;
         const rowY = y;
         doc.text(emp.employeeName, colArbeit + 8, rowY, { width: colMenge - colArbeit - 14 });
         doc.text(`${formatHoursQty(emp.hours)} h`, colMenge, rowY, { width: mengeW, align: 'right' });
@@ -148,7 +152,6 @@ function renderInvoicePdf(invoice) {
     }
 
     y += 4;
-    // Bottom rule
     doc
       .moveTo(MARGIN_X, y)
       .lineTo(contentRight, y)
@@ -158,10 +161,7 @@ function renderInvoicePdf(invoice) {
     y += 8;
 
     const drawTotalRow = (label, amount, { bold = false } = {}) => {
-      if (y > pageHeight - 50 * MM) {
-        doc.addPage();
-        y = MARGIN_TOP;
-      }
+      if (ensureSpace(y + 20)) y = MARGIN_TOP;
       const rowY = y;
       doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 11 : 10).fillColor('#152830');
       doc.text(label, colArbeit, rowY, { width: colTotal - colArbeit - 8 });
@@ -176,10 +176,7 @@ function renderInvoicePdf(invoice) {
     y += 12 * MM;
     doc.font('Helvetica').fontSize(9).fillColor('#152830');
     for (const line of view.footerLines) {
-      if (y > pageHeight - 20 * MM) {
-        doc.addPage();
-        y = MARGIN_TOP;
-      }
+      if (ensureSpace(y + 16)) y = MARGIN_TOP;
       doc.text(line, MARGIN_X, y, { width: contentWidth, align: 'left' });
       y = doc.y + 3;
     }

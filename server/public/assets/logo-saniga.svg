@@ -1,19 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 40" fill="none" aria-hidden="true">
-  <!-- Arch over N–I -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" fill="none" aria-hidden="true">
+  <!-- Arch over N -->
   <path
-    d="M70 11c0-6.5 8.2-10.5 16.5-10.5S103 4.5 103 11"
+    d="M52 12c0-7 7.2-11.5 14.5-11.5S81 5 81 12"
     stroke="#12B8E1"
-    stroke-width="4.2"
+    stroke-width="4.4"
     stroke-linecap="round"
     fill="none"
   />
   <text
     x="0"
-    y="32"
-    font-family="Arial, Helvetica, 'Segoe UI', sans-serif"
-    font-size="26"
-    font-weight="800"
+    y="33"
+    font-family="Arial Black, Arial, Helvetica, sans-serif"
+    font-size="28"
+    font-weight="900"
     fill="#12B8E1"
-    letter-spacing="0.04em"
-  >SANIGA AG</text>
+    letter-spacing="0.02em"
+  >SANIGA</text>
 </svg>

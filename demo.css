@@ -70,10 +70,11 @@ body {
   display:flex; flex-direction:column; align-items:flex-start; gap:10px;
 }
 .logo-img {
-  height: 28px;
+  height: 36px;
   width: auto;
-  max-width: 100%;
+  max-width: 190px;
   display: block;
+  object-fit: contain;
 }
 .logo-sub  { font-size:10px;color:rgba(255,255,255,.34);font-family:'JetBrains Mono';letter-spacing:.5px; }
 .nav { padding:12px 10px;flex:1; }

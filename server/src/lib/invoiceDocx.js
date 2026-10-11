@@ -94,7 +94,7 @@ async function renderInvoiceDocx(invoice) {
   const logoBuf = loadLogoPng();
   const children = [];
 
-  // Logo top-right (~55mm wide). PNG is 630×120 @3x of the SVG viewBox.
+  // Logo top-right (~55mm wide). Asset is tight-cropped 3x SVG export (370×100).
   children.push(
     new Paragraph({
       alignment: AlignmentType.RIGHT,
@@ -103,8 +103,8 @@ async function renderInvoiceDocx(invoice) {
         new ImageRun({
           type: 'png',
           data: logoBuf,
-          transformation: { width: 208, height: 40 },
-          altText: { title: 'Saniga AG', description: 'Saniga AG Logo', name: 'logo-saniga' },
+          transformation: { width: 208, height: 56 },
+          altText: { title: 'Saniga', description: 'Saniga Logo', name: 'logo-saniga' },
         }),
       ],
     })
@@ -113,23 +113,14 @@ async function renderInvoiceDocx(invoice) {
   // Recipient + Hinwil date: left edge ~55% of content width
   const leftSpacer = Math.round(PAGE_CONTENT_DXA * 0.55);
   const rightCol = PAGE_CONTENT_DXA - leftSpacer;
-  const addressLines = view.customerAddress
-    ? String(view.customerAddress)
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter(Boolean)
-    : [];
+  const recipientLines = view.recipientLines || [view.customerName || '', '', ''];
 
   const recipientParas = [
-    new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      children: [new TextRun({ text: view.customerName || '', size: 20, font: 'Calibri', color: '152830' })],
-    }),
-    ...addressLines.map(
+    ...recipientLines.map(
       (line) =>
         new Paragraph({
           alignment: AlignmentType.RIGHT,
-          children: [new TextRun({ text: line, size: 20, font: 'Calibri', color: '2A4A55' })],
+          children: [new TextRun({ text: line || ' ', size: 20, font: 'Calibri', color: '152830' })],
         })
     ),
     new Paragraph({ spacing: { before: 160 }, children: [] }),
@@ -316,6 +307,7 @@ async function renderInvoiceDocx(invoice) {
   }
 
   const doc = new Document({
+    background: { color: 'FFFFFF' },
     sections: [
       {
         properties: {

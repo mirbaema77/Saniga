@@ -9,6 +9,7 @@ const {
   buildLineItems,
   totalsFromLines,
   buildInvoiceView,
+  workDateBounds,
 } = require('../lib/invoiceMath');
 const { renderInvoicePdf } = require('../lib/invoicePdf');
 const { renderInvoiceDocx } = require('../lib/invoiceDocx');
@@ -32,13 +33,19 @@ function ymdToUtcDate(ymd, endOfDay = false) {
   return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
 }
 
+/** First number used in a new year when no invoices exist yet (default 1). */
+function invoiceStartNumber() {
+  const n = parseInt(process.env.INVOICE_START_NUMBER || '1', 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
 async function nextInvoiceNumber(year) {
   const suffix = `/${year}`;
   const existing = await prisma.invoice.findMany({
     where: { number: { endsWith: suffix } },
     select: { number: true },
   });
-  let max = 0;
+  let max = invoiceStartNumber() - 1;
   for (const row of existing) {
     const n = parseInt(String(row.number).split('/')[0], 10);
     if (Number.isFinite(n) && n > max) max = n;
@@ -154,9 +161,13 @@ router.post('/', async (req, res) => {
 
   const lineItems = buildLineItems(entries);
   const number = await nextInvoiceNumber(year);
-  const issueDate = new Date();
-  const periodFrom = ymdToUtcDate(from, false);
-  const periodTo = ymdToUtcDate(to, true);
+  const { from: workFrom, to: workTo } = workDateBounds(entries);
+  const periodFromYmd = workFrom || from;
+  const periodToYmd = workTo || to;
+  const periodFrom = ymdToUtcDate(periodFromYmd, false);
+  const periodTo = ymdToUtcDate(periodToYmd, false);
+  // Issue date defaults to the last day with hours on this invoice
+  const issueDate = ymdToUtcDate(periodToYmd, false);
 
   const invoice = await prisma.$transaction(async (tx) => {
     const created = await tx.invoice.create({
