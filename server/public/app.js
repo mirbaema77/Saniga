@@ -618,17 +618,26 @@ function bindMobileBottomNav() {
   const nav = document.getElementById('mobileBottomNav');
   if (!nav || nav.dataset.bound === '1') return;
   nav.dataset.bound = '1';
-  let armed = null;
+  let lastPointerView = '';
+  let lastPointerAt = 0;
+
+  function go(btn) {
+    if (!btn || !nav.contains(btn)) return false;
+    const view = btn.getAttribute('data-view');
+    if (!view) return false;
+    btn.classList.add('is-pressed');
+    showView(view);
+    return true;
+  }
 
   nav.addEventListener(
     'pointerdown',
     (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       const btn = e.target.closest('.mbnav-item');
-      if (!btn || !nav.contains(btn)) return;
-      armed = btn;
-      btn.classList.add('is-pressed');
-      const view = btn.getAttribute('data-view');
-      if (view) showView(view);
+      if (!go(btn)) return;
+      lastPointerView = btn.getAttribute('data-view') || '';
+      lastPointerAt = Date.now();
       // Stop the delayed click that iOS fires afterwards (felt like “tap does nothing”).
       e.preventDefault();
     },
@@ -636,7 +645,6 @@ function bindMobileBottomNav() {
   );
 
   const clearPressed = () => {
-    armed = null;
     nav.querySelectorAll('.is-pressed').forEach((b) => b.classList.remove('is-pressed'));
   };
   nav.addEventListener('pointerup', clearPressed);
@@ -648,8 +656,9 @@ function bindMobileBottomNav() {
     const btn = e.target.closest('.mbnav-item');
     if (!btn || !nav.contains(btn)) return;
     e.preventDefault();
-    const view = btn.getAttribute('data-view');
-    if (view) showView(view);
+    const view = btn.getAttribute('data-view') || '';
+    if (view && view === lastPointerView && Date.now() - lastPointerAt < 450) return;
+    go(btn);
   });
 }
 

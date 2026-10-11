@@ -505,7 +505,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   }
 
   :root {
-    --mnav-h: calc(64px + env(safe-area-inset-bottom, 0px));
+    --mnav-h: calc(72px + env(safe-area-inset-bottom, 0px));
     --mfab-h: 52px;
     --mfab-gap: 14px;
   }
@@ -575,44 +575,72 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     box-sizing: border-box;
     background: #0f1f25;
     border-top: 1px solid rgba(255,255,255,.1);
-    padding: 6px 2px calc(8px + env(safe-area-inset-bottom, 0px));
-    justify-content: space-between;
+    padding: 0;
+    justify-content: stretch;
+    align-items: stretch;
     gap: 0;
     touch-action: manipulation;
     -webkit-user-select: none;
     user-select: none;
   }
   .mobile-bottom-nav .mbnav-item {
-    flex: 1;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 2px;
-    min-height: 52px;
-    padding: 10px 2px;
-    border: none; background: transparent;
-    color: rgba(255,255,255,.5);
-    font-family: inherit; font-size: 10px; font-weight: 650;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    height: 100%;
+    min-height: 72px;
+    padding: 10px 4px calc(10px + env(safe-area-inset-bottom, 0px));
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,.55);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
     letter-spacing: 0.01em;
-    border-radius: 12px;
+    line-height: 1.1;
+    border-radius: 0;
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     -webkit-user-select: none;
     user-select: none;
   }
-  .mobile-bottom-nav .mbnav-item svg {
-    width: 24px; height: 24px; stroke-width: 2;
+  .mobile-bottom-nav .mbnav-item .mbnav-ico {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
     pointer-events: none;
+  }
+  .mobile-bottom-nav .mbnav-item .mbnav-ico svg {
+    width: 26px;
+    height: 26px;
+    stroke-width: 2.1;
+    pointer-events: none;
+  }
+  .mobile-bottom-nav .mbnav-item .mbnav-lbl {
+    pointer-events: none;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .mobile-bottom-nav .mbnav-item.active {
     color: #fff;
-    background: rgba(18,184,225,.18);
+    background: rgba(18,184,225,.2);
   }
-  .mobile-bottom-nav .mbnav-item.active svg {
+  .mobile-bottom-nav .mbnav-item.active .mbnav-ico svg {
     stroke: #5fd4f0;
   }
   .mobile-bottom-nav .mbnav-item.is-pressed,
   .mobile-bottom-nav .mbnav-item:active {
-    background: rgba(255,255,255,.1);
+    background: rgba(255,255,255,.12);
   }
 
   .mobile-fab {
@@ -1171,7 +1199,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   }
 
   .form-row { grid-template-columns: 1fr; }
-  .toast { left: 14px; right: 14px; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); max-width: none; }
+  .toast { left: 14px; right: 14px; bottom: calc(var(--mnav-h) + 12px); max-width: none; }
 
   #authGate { padding: 16px; align-items: flex-start; padding-top: 10vh; }
   .auth-card { padding: 24px 18px; max-width: 100%; }
@@ -1907,21 +1935,21 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 </main>
 
 <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Hauptnavigation">
-  <button type="button" class="mbnav-item active" data-view="meine">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-    Zeiten
+  <button type="button" class="mbnav-item active" data-view="meine" aria-label="Zeiten">
+    <span class="mbnav-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+    <span class="mbnav-lbl">Zeiten</span>
   </button>
-  <button type="button" class="mbnav-item" data-view="monat">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h4"/></svg>
-    Monat
+  <button type="button" class="mbnav-item" data-view="monat" aria-label="Monat">
+    <span class="mbnav-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg></span>
+    <span class="mbnav-lbl">Monat</span>
   </button>
-  <button type="button" class="mbnav-item" data-view="absenzen">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-    Absenzen
+  <button type="button" class="mbnav-item" data-view="absenzen" aria-label="Absenzen">
+    <span class="mbnav-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 7.8a3.5 3.5 0 0 0-5-5L5 13l-1.5 5.5L9 17l10.2-9.2z"/><path d="M14.5 4.5l5 5"/></svg></span>
+    <span class="mbnav-lbl">Absenz</span>
   </button>
-  <button type="button" class="mbnav-item" data-view="profil">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-    Profil
+  <button type="button" class="mbnav-item" data-view="profil" aria-label="Profil">
+    <span class="mbnav-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+    <span class="mbnav-lbl">Profil</span>
   </button>
 </nav>
 <button type="button" class="mobile-fab" id="mobileFab" onclick="openAdd()">
