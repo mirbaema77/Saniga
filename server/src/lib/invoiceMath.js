@@ -1,7 +1,4 @@
-/** Flat billing rate for invoice line items (CHF per hour). */
-const HOURLY_RATE_CHF = 70.0;
-
-/** Default Swiss VAT rate for invoices. */
+/** Fallback VAT if company record is unavailable. */
 const DEFAULT_VAT_RATE = 8.1;
 
 function entryHours(e) {
@@ -27,59 +24,58 @@ function formatHoursQty(n) {
 }
 
 /**
- * Group entries by work type, then employee; sum hours.
- * @returns {{ workTypeId: string|null, workTypeLabel: string, employees: { employeeId, employeeName, hours, amount }[], hours, amount }[]}
+ * Group frozen InvoiceLine rows (or equivalent) by work type for display.
+ * Each employee row carries its own chfPerHour.
  */
-function buildLineItems(entries) {
+function groupFrozenLines(lines) {
   const byWork = new Map();
-
-  for (const e of entries) {
-    const wtId = e.workTypeId || '__none__';
-    const wtLabel = e.workType?.label || 'Ohne Arbeitstyp';
+  for (const line of lines || []) {
+    const wtId = line.workTypeId || '__none__';
+    const wtLabel =
+      line.workTypeLabel || line.workType?.label || 'Ohne Arbeitstyp';
     if (!byWork.has(wtId)) {
       byWork.set(wtId, {
-        workTypeId: e.workTypeId || null,
+        workTypeId: line.workTypeId || null,
         workTypeLabel: wtLabel,
-        byEmp: new Map(),
+        employees: [],
+        hours: 0,
+        amount: 0,
       });
     }
-    const group = byWork.get(wtId);
-    const empId = e.userId;
-    const empName = `${e.user.firstName} ${e.user.lastName}`.trim();
-    if (!group.byEmp.has(empId)) {
-      group.byEmp.set(empId, { employeeId: empId, employeeName: empName, hours: 0 });
-    }
-    const row = group.byEmp.get(empId);
-    row.hours = round2(row.hours + entryHours(e));
+    const g = byWork.get(wtId);
+    const hours = round2(Number(line.hours));
+    const chfPerHour = round2(Number(line.chfPerHour));
+    const amount = round2(
+      Number(line.total != null ? line.total : hours * chfPerHour)
+    );
+    const empName =
+      line.employeeName ||
+      (line.user
+        ? `${line.user.firstName} ${line.user.lastName}`.trim()
+        : 'Mitarbeiter');
+    g.employees.push({
+      employeeId: line.userId || null,
+      employeeName: empName,
+      hours,
+      chfPerHour,
+      amount,
+    });
+    g.hours = round2(g.hours + hours);
+    g.amount = round2(g.amount + amount);
   }
 
-  const lines = [...byWork.values()]
-    .map((g) => {
-      const employees = [...g.byEmp.values()]
-        .map((emp) => ({
-          employeeId: emp.employeeId,
-          employeeName: emp.employeeName,
-          hours: emp.hours,
-          amount: round2(emp.hours * HOURLY_RATE_CHF),
-        }))
-        .sort((a, b) => a.employeeName.localeCompare(b.employeeName, 'de'));
-      const hours = round2(employees.reduce((s, e) => s + e.hours, 0));
-      const amount = round2(employees.reduce((s, e) => s + e.amount, 0));
-      return {
-        workTypeId: g.workTypeId,
-        workTypeLabel: g.workTypeLabel,
-        employees,
-        hours,
-        amount,
-      };
-    })
+  return [...byWork.values()]
+    .map((g) => ({
+      ...g,
+      employees: g.employees.sort((a, b) =>
+        a.employeeName.localeCompare(b.employeeName, 'de')
+      ),
+    }))
     .sort((a, b) => a.workTypeLabel.localeCompare(b.workTypeLabel, 'de'));
-
-  return lines;
 }
 
 function totalsFromLines(lines, vatRate) {
-  const subtotal = round2(lines.reduce((s, l) => s + l.amount, 0));
+  const subtotal = round2(lines.reduce((s, l) => s + Number(l.amount || 0), 0));
   const vat = round2(subtotal * (Number(vatRate) / 100));
   const total = round2(subtotal + vat);
   return { subtotal, vat, total };
@@ -89,7 +85,6 @@ function pad2(n) {
   return String(n).padStart(2, '0');
 }
 
-/** Civil DD.MM.YYYY in Europe/Zurich (issue date) or UTC calendar for stored period bounds. */
 function formatDeDate(d, { utc = false } = {}) {
   const dt = d instanceof Date ? d : new Date(d);
   if (utc) {
@@ -112,41 +107,17 @@ function formatVatRate(rate) {
   return Number.isInteger(n) ? String(n) : String(n);
 }
 
-/**
- * Split customer address into street + "PLZ Ort" for the 3-line recipient block.
- * Accepts newline-separated address or a single line with Swiss postcode.
- */
-function parseAddressParts(address) {
-  const raw = String(address || '').trim();
-  if (!raw) return { street: '', cityLine: '' };
-
-  const lines = raw
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  if (lines.length >= 2) {
-    return { street: lines[0], cityLine: lines.slice(1).join(' ') };
-  }
-
-  const single = lines[0] || '';
-  const m =
-    single.match(/^(.+?),?\s+(\d{4}\s+.+)$/) ||
-    single.match(/^(.+?)\s+(\d{4}\s+.+)$/);
-  if (m) {
-    return { street: m[1].trim(), cityLine: m[2].trim() };
-  }
-  return { street: single, cityLine: '' };
-}
-
-/** Company name, street, postcode+city — always three slots for the recipient block. */
+/** name / street / "PLZ Ort" */
 function buildRecipientLines(customer) {
   const name = (customer?.name || '').trim();
-  const { street, cityLine } = parseAddressParts(customer?.address);
+  const street = (customer?.street || '').trim();
+  const cityLine = [customer?.postalCode, customer?.city]
+    .map((s) => (s || '').trim())
+    .filter(Boolean)
+    .join(' ');
   return [name, street, cityLine];
 }
 
-/** First/last YYYY-MM-DD among entries that contribute hours. */
 function workDateBounds(entries) {
   const dates = (entries || [])
     .filter((e) => entryHours(e) > 0)
@@ -157,40 +128,68 @@ function workDateBounds(entries) {
   return { from: dates[0], to: dates[dates.length - 1] };
 }
 
-/** Shared presentation model for PDF and Word renderers. */
-function buildInvoiceView(invoice) {
-  const lineItems = buildLineItems(invoice.entries || []);
-  const vatRate = Number(invoice.vatRate);
+function formatYmdDe(ymd) {
+  const [y, m, d] = String(ymd).split('-');
+  if (!y || !m || !d) return '';
+  return `${d}.${m}.${y}`;
+}
+
+/**
+ * @param {object} invoice — must include frozen `lines` (or precomputed lineItems)
+ * @param {object} [company]
+ */
+function buildInvoiceView(invoice, company = null) {
+  const lineItems =
+    invoice.lineItems ||
+    groupFrozenLines(invoice.lines || []);
+  const vatRate = Number(
+    invoice.vatRate != null ? invoice.vatRate : company?.vatRate ?? DEFAULT_VAT_RATE
+  );
   const totals = totalsFromLines(lineItems, vatRate);
   const siteLabel = invoice.site?.label || '';
-  const periodFromLabel = formatDeDate(invoice.periodFrom, { utc: true });
-  const periodToLabel = formatDeDate(invoice.periodTo, { utc: true });
+  const objectNumber = (invoice.site?.objectNumber || '').trim();
+  const bounds = workDateBounds(invoice.entries || []);
+  const periodFromLabel = bounds.from
+    ? formatYmdDe(bounds.from)
+    : formatDeDate(invoice.periodFrom, { utc: true });
+  const periodToLabel = bounds.to
+    ? formatYmdDe(bounds.to)
+    : formatDeDate(invoice.periodTo, { utc: true });
+  const issueDateLabel = bounds.to
+    ? formatYmdDe(bounds.to)
+    : formatDeDate(invoice.issueDate, { utc: true });
   const recipientLines = buildRecipientLines(invoice.customer);
+  const paymentDays = invoice.customer?.paymentTermDays ?? 14;
+  const companyName = company?.name || 'Saniga AG';
+  const companyCity = (company?.city || 'Hinwil').trim() || 'Hinwil';
+  const uid = (company?.uid || 'CHE-298.414.455').trim();
+
   return {
     number: invoice.number,
     customerName: recipientLines[0] || '',
-    customerAddress: invoice.customer?.address || '',
     recipientLines,
     siteLabel,
-    // issueDate is stored as the last work day (UTC calendar date)
-    issueDateLabel: formatDeDate(invoice.issueDate, { utc: true }),
+    objectNumber,
+    issueDateLabel,
+    issuePlaceLabel: companyCity,
     periodFromLabel,
     periodToLabel,
     vatRate,
     vatRateLabel: formatVatRate(vatRate),
-    hourlyRate: HOURLY_RATE_CHF,
+    paymentTermDays: paymentDays,
+    companyName,
     metaRows: [
-      { label: 'MWST.-Nr.', value: 'CHE-298.414.455' },
+      { label: 'MWST.-Nr.', value: uid },
       { label: 'Objekt-Liegenschaft', value: siteLabel },
-      { label: 'Objekt-Nr.', value: '' },
+      { label: 'Objekt-Nr.', value: objectNumber },
       { label: 'Arbeitsgattung', value: 'BKP 250 Sanitäranlagen' },
       { label: 'Ausführungsdatum', value: `${periodFromLabel} – ${periodToLabel}` },
     ],
     footerLines: [
-      'Zahlungsbedingungen: 14 Tage netto',
+      `Zahlungsbedingungen: ${paymentDays} Tage netto`,
       'Wir bedanken uns für den Auftrag und die Zusammenarbeit.',
       'Freundliche Grüsse',
-      'Saniga AG',
+      companyName,
     ],
     lineItems,
     ...totals,
@@ -198,17 +197,16 @@ function buildInvoiceView(invoice) {
 }
 
 module.exports = {
-  HOURLY_RATE_CHF,
   DEFAULT_VAT_RATE,
   entryHours,
   round2,
   formatSwissAmount,
   formatHoursQty,
-  buildLineItems,
+  groupFrozenLines,
   totalsFromLines,
   formatDeDate,
+  formatYmdDe,
   formatVatRate,
-  parseAddressParts,
   buildRecipientLines,
   workDateBounds,
   buildInvoiceView,

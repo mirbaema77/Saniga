@@ -9,6 +9,7 @@ function toPublicUser(u) {
     jobTitle: u.jobTitle,
     hourlyRate: Number(u.hourlyRate),
     weeklyHours: u.weeklyHours,
+    isTimeTracked: u.isTimeTracked !== false,
     avatarColor: u.avatarColor,
     createdAt: u.createdAt,
   };

@@ -8,9 +8,7 @@ function getBearer(req) {
     const fromHeader = h.slice(7).trim();
     if (fromHeader) return fromHeader;
   }
-  // Allow token query for <a href> file downloads (PDF/Word) that cannot set Authorization.
-  const q = req.query && typeof req.query.token === 'string' ? req.query.token.trim() : '';
-  return q || null;
+  return null;
 }
 
 async function requireAuth(req, res, next) {

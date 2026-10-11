@@ -69,9 +69,9 @@ body {
   display:flex; flex-direction:column; align-items:flex-start; gap:8px;
 }
 .logo-img {
-  height: 40px;
+  height: 36px;
   width: auto;
-  max-width: 210px;
+  max-width: 220px;
   display: block;
   object-fit: contain;
 }
@@ -158,10 +158,21 @@ body {
 /* ── STATS ── */
 .stats-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px; }
 .stat-card { background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow);position:relative;overflow:hidden; }
+.stat-card-link { cursor:pointer;transition:border-color .15s,box-shadow .15s; }
+.stat-card-link:hover { border-color:var(--saniga-red);box-shadow:0 6px 20px rgba(196,48,48,.12); }
 .stat-accent { position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius) var(--radius) 0 0; }
 .stat-lbl { font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px; }
 .stat-val { font-size:30px;font-weight:800;color:var(--t1);line-height:1; }
 .stat-sub { font-size:12px;color:var(--t3);margin-top:5px; }
+.dash-open-warn { font-size:13px;color:var(--saniga-red);margin:0 0 14px;line-height:1.45; }
+.dash-open-warn a { color:var(--saniga-red);font-weight:600;text-decoration:underline;cursor:pointer; }
+.dash-open-table { width:100%;border-collapse:collapse;font-size:13px; }
+.dash-open-table th { text-align:left;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;padding:8px 10px;border-bottom:1px solid var(--border); }
+.dash-open-table td { padding:10px;border-bottom:1px solid var(--border);vertical-align:middle; }
+.dash-open-table tr.dash-open-stale { background:rgba(196,48,48,.06); }
+.dash-open-table tr.dash-open-stale td:first-child { box-shadow:inset 3px 0 0 var(--saniga-red); }
+.dash-open-age { font-family:'JetBrains Mono',monospace;font-size:12px; }
+.dash-open-age.stale { color:var(--saniga-red);font-weight:700; }
 
 /* ── GRID ── */
 .grid2 { display:grid;grid-template-columns:1fr 1fr;gap:20px; }
@@ -198,6 +209,13 @@ td { padding:12px 18px;font-size:13.5px;color:var(--t1); }
 .sd-panel { display:none; }
 .sd-panel.active { display:block; }
 .sd-form { display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-bottom:16px; }
+.sd-form-cust { grid-template-columns:repeat(3, 1fr); }
+.sd-form-cust .sd-form-actions { grid-column:1 / -1;display:flex;justify-content:flex-end; }
+.sd-form-firma { grid-template-columns:repeat(3, 1fr); }
+.sd-form-firma .sd-form-actions { grid-column:1 / -1;display:flex;justify-content:flex-end;gap:10px; }
+@media (max-width:900px) {
+  .sd-form-cust, .sd-form-firma { grid-template-columns:1fr 1fr; }
+}
 .sd-form .fg-check { display:flex;align-items:center;gap:8px;padding-bottom:10px; }
 .sd-form .fg-check input { width:auto; }
 .sd-err { color:var(--red);font-size:13px;margin:0 0 12px;display:none; }
@@ -209,11 +227,34 @@ td { padding:12px 18px;font-size:13.5px;color:var(--t1); }
 .legacy-time-fields { display:none !important; }
 
 /* ── RAPPORTE ── */
-.rp-toolbar { display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px; }
-.rp-week-label {
-  font-size:15px;font-weight:700;color:var(--t1);min-width:220px;text-align:center;
-  font-variant-numeric:tabular-nums;
+.rp-toolbar {
+  display:flex;flex-direction:column;gap:12px;margin-bottom:16px;
+  padding:16px 18px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
 }
+.rp-toolbar-row { display:flex;align-items:end;gap:12px;flex-wrap:wrap; }
+.rp-mode-toggle { display:flex;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden; }
+.rp-mode-toggle button {
+  border:none;background:transparent;padding:9px 14px;font-size:13px;font-weight:700;
+  color:var(--t2);cursor:pointer;font-family:inherit;
+}
+.rp-mode-toggle button.active { background:var(--saniga-red);color:#fff; }
+.rp-fg { display:flex;flex-direction:column;gap:4px;min-width:140px; }
+.rp-fg label { font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.04em; }
+.rp-fg input,.rp-fg select {
+  height:38px;padding:0 10px;border:1px solid var(--border);border-radius:9px;
+  background:#fff;font-size:13px;font-family:inherit;color:var(--t1);
+}
+.rp-presets { display:flex;gap:6px;flex-wrap:wrap;align-items:end;padding-bottom:1px; }
+.rp-presets .btn { padding:8px 12px;font-size:12px; }
+.rp-filter-summary {
+  font-size:13px;font-weight:600;color:var(--t2);margin:0 0 16px;padding:0 2px;
+}
+.rp-nb-badge {
+  display:inline-block;margin-left:6px;padding:2px 7px;border-radius:6px;
+  font-size:10px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;
+  color:#8a5a00;background:rgba(245,166,35,.18);white-space:nowrap;vertical-align:middle;
+}
+.rp-entry-nonbillable td { color:var(--t2); }
 .rp-customer { margin-bottom:18px; }
 .rp-customer-head {
   display:flex;justify-content:space-between;align-items:baseline;gap:12px;
@@ -243,8 +284,11 @@ td { padding:12px 18px;font-size:13.5px;color:var(--t1); }
 /* ── RECHNUNGEN ── */
 .inv-list { display:flex;flex-direction:column;gap:10px; }
 .inv-row {
-  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  display:flex;flex-direction:column;gap:10px;
   padding:14px 16px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-s);
+}
+.inv-row-top {
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
 }
 .inv-row-main { display:flex;flex-direction:column;gap:4px;min-width:0; }
 .inv-row-num { font-size:15px;font-weight:800; }
@@ -252,6 +296,26 @@ td { padding:12px 18px;font-size:13.5px;color:var(--t1); }
 .inv-row-total { font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--t1); }
 .inv-row-actions { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
 .inv-row-actions .btn { padding:6px 12px;font-size:12px;text-decoration:none; }
+.inv-row.cancelled { opacity:.72; background:rgba(240,242,247,.9); }
+.inv-row.cancelled .inv-row-num,
+.inv-row.cancelled .inv-row-total { color:var(--t3); }
+.inv-badge-cancelled {
+  display:inline-block;margin-left:8px;padding:2px 7px;border-radius:6px;
+  font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;
+  color:#7a3b00;background:rgba(245,166,35,.2);vertical-align:middle;
+}
+.inv-cancel-reason { font-size:12px;color:var(--t3);margin-top:2px; }
+.inv-cancel-panel {
+  display:none;width:100%;padding-top:8px;border-top:1px solid var(--border);
+}
+.inv-cancel-panel.open { display:block; }
+.inv-cancel-panel .fg { margin-bottom:8px; }
+.inv-cancel-panel input {
+  width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:9px;
+  background:#fff;font-size:13px;font-family:inherit;
+}
+.inv-cancel-err { color:var(--red);font-size:12px;margin:0 0 8px;display:none; }
+.inv-cancel-actions { display:flex;gap:8px;flex-wrap:wrap; }
 
 /* ── BUTTONS ── */
 .btn { display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .16s;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap; }
@@ -298,6 +362,20 @@ select option { background:white; }
 .ei-acts { display:flex;gap:6px;opacity:0;transition:opacity .15s; }
 .ei:hover .ei-acts { opacity:1; }
 .ib { width:28px;height:28px;border-radius:7px;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s; }
+.ib.disabled { opacity:.4; cursor:not-allowed; pointer-events:auto; }
+.ib.disabled:hover { background:var(--bg); border-color:var(--border); color:inherit; }
+.entry-alt-badge {
+  display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;
+  font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;
+  color:var(--t3);background:rgba(100,116,139,.12);vertical-align:middle;
+}
+.entry-abs-badge {
+  display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;
+  font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;
+  color:#5b21b6;background:rgba(124,58,237,.12);vertical-align:middle;
+}
+.entry-absence td { background:rgba(124,58,237,.04); }
+.ei.entry-absence { background:rgba(124,58,237,.05); border-radius:8px; }
 .ib:hover { background:white;border-color:var(--t3); }
 .ib svg { width:13px;height:13px; }
 .ib.del:hover { background:var(--red-b);border-color:rgba(220,38,38,.3);color:var(--red); }
@@ -413,7 +491,10 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   <div class="auth-card">
     <h1>Saniga Zeiterfassung</h1>
     <p>Anmelden mit Ihrer E-Mail und Ihrem Passwort. Mitarbeitende ohne Konto können sich über den Einladungslink registrieren.</p>
-    <p style="font-size:12px;color:var(--t3);line-height:1.45;">Alle sehen « Lohnabrechnung » (eigene Übersicht; PDF-Druck). Konten mit Rolle <strong>Admin</strong> sehen zusätzlich « Geschäftsführung » (Dashboard, Team, alle Einträge) und können Lohn-Parameter bearbeiten.</p>
+    <!-- Login hint previously mentioned Lohnabrechnung; payroll is external (Treuhänder).
+    <p style="font-size:12px;color:var(--t3);line-height:1.45;">Alle sehen « Lohnabrechnung » …</p>
+    -->
+    <p style="font-size:12px;color:var(--t3);line-height:1.45;">Mitarbeitende erfassen Stunden. Konten mit Rolle <strong>Admin</strong> sehen zusätzlich Dashboard, Team, Rapporte, Rechnungen und den Stundenexport für den Treuhänder.</p>
     <div class="fg" style="margin-bottom:14px;">
       <label>E-Mail</label>
       <input type="email" id="loginEmail" autocomplete="username" placeholder="name@firma.ch">
@@ -434,12 +515,12 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <img src="/assets/logo-saniga.png" alt="SANIGA" class="logo-img" width="190" height="60" decoding="async"/>
+    <img src="/assets/logo-saniga.svg" alt="SANIGA AG" class="logo-img" width="220" height="40" decoding="async"/>
     <div class="logo-sub">Zeiterfassung</div>
   </div>
   <nav class="nav">
     <div class="nav-sec">Mitarbeiter</div>
-    <div class="nav-item active" onclick="showView('meine')">
+    <div class="nav-item" onclick="showView('meine')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Meine Zeiten
     </div>
@@ -447,10 +528,12 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       Monatsübersicht
     </div>
+    <!-- Payroll UI hidden: Lohn goes to external Treuhänder; restore if in-app payslips return.
     <div class="nav-item" onclick="showView('lohn')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       Lohnabrechnung
     </div>
+    -->
     <div class="nav-sec admin-only-nav hidden">Admin</div>
     <div class="nav-item admin-only-nav hidden" onclick="showView('dashboard')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -475,6 +558,14 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     <div class="nav-item admin-only-nav hidden" onclick="showView('rechnungen')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
       Rechnungen
+    </div>
+    <div class="nav-item admin-only-nav hidden" onclick="showView('stundenexport')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Stundenexport
+    </div>
+    <div class="nav-item admin-only-nav hidden" onclick="showView('absenzen')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/></svg>
+      Absenzen
     </div>
   </nav>
   <div class="sidebar-bottom">
@@ -529,11 +620,13 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             <div class="pb" style="margin-bottom:6px;"><div class="pf" id="mProg" style="width:0%;background:linear-gradient(90deg,var(--saniga-red),var(--saniga-red-l));"></div></div>
             <div style="font-size:11px;color:var(--t3);" id="mPct">0% erfüllt</div>
           </div>
+          <!-- Hidden: payroll is external (Treuhänder). Restore "Erwarteter Lohn" if payslips return.
           <div class="card" style="padding:20px;">
             <div class="stat-lbl" style="margin-bottom:6px;" id="mLohnLabel">Erwarteter Lohn</div>
             <div style="font-size:26px;font-weight:800;color:var(--green);line-height:1;" id="mLohn">CHF 0.–</div>
             <div style="font-size:12px;color:var(--t3);margin-top:4px;" id="mRate">bei CHF 35.–/h</div>
           </div>
+          -->
         </div>
       </div>
     </div>
@@ -554,7 +647,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           <span class="badge bo" id="monBadge">0h</span>
         </div>
         <table>
-          <thead><tr><th>Datum</th><th>Von</th><th>Bis</th><th>Pause</th><th>Netto</th><th>Notiz</th><th></th></tr></thead>
+          <thead><tr><th>Datum</th><th>Objekt</th><th>Arbeit</th><th>Stunden</th><th>Bemerkung</th><th></th></tr></thead>
           <tbody id="monBody"></tbody>
         </table>
       </div>
@@ -563,11 +656,11 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     <!-- ═══ DASHBOARD ═══ -->
     <div class="view" id="view-dashboard">
       <div class="stats-grid mb24">
-        <div class="stat-card">
+        <div class="stat-card stat-card-link" id="dOpenCard" role="button" tabindex="0" onclick="openRapporteOpenHours()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openRapporteOpenHours();}">
           <div class="stat-accent" style="background:linear-gradient(90deg,var(--saniga-red),var(--saniga-red-l));"></div>
-          <div class="stat-lbl">Team heute</div>
-          <div class="stat-val" style="color:var(--saniga-red);" id="dAct">—</div>
-          <div class="stat-sub">Einträge erfasst</div>
+          <div class="stat-lbl">Offene Stunden</div>
+          <div class="stat-val" style="color:var(--saniga-red);" id="dOpenHrs">—</div>
+          <div class="stat-sub" id="dOpenAmt">netto CHF —</div>
         </div>
         <div class="stat-card">
           <div class="stat-accent" style="background:var(--green);"></div>
@@ -586,6 +679,26 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           <div class="stat-lbl" id="dLohnLbl">Lohnkosten</div>
           <div class="stat-val" style="font-size:21px;" id="dLohn">—</div>
           <div class="stat-sub">Brutto geschätzt</div>
+        </div>
+      </div>
+      <p class="dash-open-warn" id="dOpenMissing" style="display:none;"></p>
+      <div class="card mb24">
+        <div class="card-header">
+          <div class="card-title">Nicht verrechnet</div>
+          <span class="badge bo" id="dOpenCount">0</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="dash-open-table">
+            <thead>
+              <tr>
+                <th>Kunde / Objekt</th>
+                <th>Stunden</th>
+                <th>Betrag netto</th>
+                <th>Alter</th>
+              </tr>
+            </thead>
+            <tbody id="dOpenBody"></tbody>
+          </table>
         </div>
       </div>
       <div class="grid2">
@@ -668,15 +781,21 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         <button type="button" class="sd-tab active" data-sd-tab="kunden" onclick="showStammdatenTab('kunden')">Kunden</button>
         <button type="button" class="sd-tab" data-sd-tab="objekte" onclick="showStammdatenTab('objekte')">Objekte</button>
         <button type="button" class="sd-tab" data-sd-tab="arbeitsarten" onclick="showStammdatenTab('arbeitsarten')">Arbeitsarten</button>
+        <button type="button" class="sd-tab" data-sd-tab="ansaetze" onclick="showStammdatenTab('ansaetze')">Ansätze</button>
+        <button type="button" class="sd-tab" data-sd-tab="firma" onclick="showStammdatenTab('firma')">Firma</button>
       </div>
 
       <div class="sd-panel active" id="sd-panel-kunden">
         <div class="card" style="padding:20px 22px;margin-bottom:16px;">
           <div class="card-title" style="margin-bottom:14px;">Kunde hinzufügen</div>
-          <div class="sd-form">
+          <div class="sd-form sd-form-cust">
             <div class="fg"><label>Name *</label><input type="text" id="sdCustName" placeholder="z.B. Muster AG" maxlength="200"></div>
-            <div class="fg"><label>Adresse (optional)</label><input type="text" id="sdCustAddr" placeholder="Strasse, PLZ Ort" maxlength="500"></div>
-            <button type="button" class="btn btn-p" onclick="addCustomer()">Hinzufügen</button>
+            <div class="fg"><label>Strasse</label><input type="text" id="sdCustStreet" placeholder="z.B. Bahnhofstrasse 1" maxlength="500"></div>
+            <div class="fg"><label>PLZ</label><input type="text" id="sdCustZip" placeholder="8001" maxlength="20"></div>
+            <div class="fg"><label>Ort</label><input type="text" id="sdCustCity" placeholder="Zürich" maxlength="120"></div>
+            <div class="fg"><label>Kontaktperson</label><input type="text" id="sdCustContact" placeholder="optional" maxlength="200"></div>
+            <div class="fg"><label>Zahlungsziel (Tage)</label><input type="number" id="sdCustPayDays" min="0" max="365" step="1" value="14"></div>
+            <div class="sd-form-actions"><button type="button" class="btn btn-p" onclick="addCustomer()">Hinzufügen</button></div>
           </div>
           <p class="sd-err" id="sdCustErr"></p>
         </div>
@@ -686,7 +805,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             <span class="badge bo" id="sdCustCount">0</span>
           </div>
           <table>
-            <thead><tr><th>Name</th><th>Adresse</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Strasse</th><th>PLZ</th><th>Ort</th><th>Kontakt</th><th>Tage</th><th></th></tr></thead>
             <tbody id="sdCustBody"></tbody>
           </table>
         </div>
@@ -695,9 +814,10 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       <div class="sd-panel" id="sd-panel-objekte">
         <div class="card" style="padding:20px 22px;margin-bottom:16px;">
           <div class="card-title" style="margin-bottom:14px;">Objekt hinzufügen</div>
-          <div class="sd-form" style="grid-template-columns:1fr 1fr 1fr auto;">
+          <div class="sd-form" style="grid-template-columns:1fr 1fr 1fr 1fr auto;">
             <div class="fg"><label>Kunde *</label><select id="sdSiteCust"></select></div>
             <div class="fg"><label>Bezeichnung *</label><input type="text" id="sdSiteLabel" placeholder="z.B. Baustelle Hinwil" maxlength="200"></div>
+            <div class="fg"><label>Objekt-Nr. (optional)</label><input type="text" id="sdSiteObjNr" placeholder="z.B. 2026-014" maxlength="100"></div>
             <div class="fg"><label>Adresse (optional)</label><input type="text" id="sdSiteAddr" placeholder="Strasse, PLZ Ort" maxlength="500"></div>
             <button type="button" class="btn btn-p" onclick="addSite()">Hinzufügen</button>
           </div>
@@ -709,7 +829,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             <span class="badge bo" id="sdSiteCount">0</span>
           </div>
           <table>
-            <thead><tr><th>Bezeichnung</th><th>Kunde</th><th>Adresse</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Bezeichnung</th><th>Objekt-Nr.</th><th>Kunde</th><th>Adresse</th><th>Status</th><th></th></tr></thead>
             <tbody id="sdSiteBody"></tbody>
           </table>
         </div>
@@ -739,9 +859,100 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           </table>
         </div>
       </div>
+
+      <div class="sd-panel" id="sd-panel-ansaetze">
+        <div class="card" style="padding:20px 22px;margin-bottom:16px;">
+          <div class="card-title" style="margin-bottom:14px;">Ansatz hinzufügen</div>
+          <div class="sd-form" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr auto;">
+            <div class="fg"><label>Kunde</label><select id="sdRateCust"></select></div>
+            <div class="fg"><label>Arbeitsart</label><select id="sdRateWt"></select></div>
+            <div class="fg"><label>Mitarbeiter</label><select id="sdRateEmp"></select></div>
+            <div class="fg"><label>CHF/Stunde *</label><input type="number" id="sdRateChf" min="0.01" max="999999" step="0.01" placeholder="70.00"></div>
+            <div class="fg"><label>gültig ab *</label><input type="date" id="sdRateFrom"></div>
+            <div class="fg"><label>gültig bis</label><input type="date" id="sdRateTo"></div>
+            <button type="button" class="btn btn-p" onclick="addRate()">Hinzufügen</button>
+          </div>
+          <p class="sd-err" id="sdRateErr"></p>
+          <p style="font-size:12px;color:var(--t3);margin:8px 0 0;">«Alle» gilt als Platzhalter. Ein neuer Ansatz für dieselbe Kombination schliesst den bisherigen am Vortag.</p>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Ansätze</div>
+            <span class="badge bo" id="sdRateCount">0</span>
+          </div>
+          <table>
+            <thead><tr><th>Kunde</th><th>Arbeitsart</th><th>Mitarbeiter</th><th>CHF/Stunde</th><th>gültig ab</th><th>gültig bis</th></tr></thead>
+            <tbody id="sdRateBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="sd-panel" id="sd-panel-firma">
+        <div class="card" style="padding:20px 22px;">
+          <div class="card-title" style="margin-bottom:14px;">Firmeneinstellungen</div>
+          <div class="sd-form sd-form-firma">
+            <div class="fg"><label>Firmenname *</label><input type="text" id="sdCoName" maxlength="200"></div>
+            <div class="fg"><label>Strasse</label><input type="text" id="sdCoStreet" maxlength="500"></div>
+            <div class="fg"><label>PLZ</label><input type="text" id="sdCoZip" maxlength="20"></div>
+            <div class="fg"><label>Ort</label><input type="text" id="sdCoCity" maxlength="120"></div>
+            <div class="fg"><label>MWST.-Nr. / UID</label><input type="text" id="sdCoUid" maxlength="40" placeholder="CHE-…"></div>
+            <div class="fg"><label>MWST-Satz (%)</label><input type="number" id="sdCoVat" min="0" max="100" step="0.01"></div>
+            <div class="fg"><label>Rechnung Startnummer</label><input type="number" id="sdCoInvStart" min="1" max="999999" step="1"></div>
+            <div class="sd-form-actions">
+              <button type="button" class="btn btn-p" onclick="saveCompany()">Speichern</button>
+            </div>
+          </div>
+          <p class="sd-err" id="sdCoErr"></p>
+          <p style="font-size:12px;color:var(--t3);margin:8px 0 0;">MWST.-Nr., Satz und Startnummer gelten für neue Rechnungen. Die Startnummer greift pro Jahr, solange noch keine höhere Nummer existiert.</p>
+        </div>
+      </div>
     </div>
 
-    <!-- ═══ LOHN ═══ -->
+    <!-- ═══ ABSENZEN ═══ -->
+    <div class="view" id="view-absenzen">
+      <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:20px;">
+        <div class="fg">
+          <label for="absMonSel">Monat</label>
+          <select id="absMonSel" onchange="renderAbsenzen()" style="width:auto;min-width:180px;"></select>
+        </div>
+      </div>
+      <p style="font-size:13px;color:var(--t2);margin:0 0 14px;line-height:1.45;">
+        Übersicht der erfassten Absenzen (Ferien, Krankheit usw.) pro Mitarbeiter im gewählten Monat.
+      </p>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" id="absTitle">Absenzen</div>
+          <span class="badge bo" id="absTotalBadge">0,0 h</span>
+        </div>
+        <div id="absBody"><div class="rp-empty" style="box-shadow:none;border:none;">Monat wählen…</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ STUNDENEXPORT (Treuhänder) ═══ -->
+    <div class="view" id="view-stundenexport">
+      <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:20px;">
+        <div class="fg">
+          <label for="exMonSel">Monat</label>
+          <select id="exMonSel" onchange="loadHoursExport()" style="width:auto;min-width:180px;"></select>
+        </div>
+        <button type="button" class="btn btn-p" id="exCsvBtn" onclick="downloadHoursExportCsv()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          CSV herunterladen
+        </button>
+      </div>
+      <p style="font-size:13px;color:var(--t2);margin:0 0 14px;line-height:1.45;">
+        Monatliche Stundenübersicht für den Treuhänder. Prüfen Sie die Zahlen, bevor Sie die CSV herunterladen.
+      </p>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" id="exTitle">Stundenexport</div>
+          <span class="badge bo" id="exTotalBadge">0,0 h</span>
+        </div>
+        <div id="exBody"><div class="card rp-empty" style="box-shadow:none;border:none;">Monat wählen…</div></div>
+      </div>
+    </div>
+
+    <!-- Payroll view hidden: Lohnabrechnung is out of scope (external Treuhänder). Uncomment to restore.
     <div class="view" id="view-lohn">
       <p id="lohnReadOnlyHint" class="lohn-readonly-hint hidden">Sie sehen Ihre Lohnübersicht nur zur Ansicht. Monat wechseln und als PDF drucken ist möglich; Lohn-Parameter bearbeitet die Geschäftsführung.</p>
       <div class="lohn-toolbar">
@@ -805,13 +1016,31 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         </div>
       </div>
     </div>
+    -->
 
     <!-- ═══ ALLE ═══ -->
     <div class="view" id="view-alle">
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;">
-        <select id="aEmpF" onchange="renderAlle()" style="width:180px;"><option value="">Alle Mitarbeiter</option></select>
-        <input type="date" id="aFrom" value="2026-03-01" onchange="renderAlle()" style="width:150px;">
-        <input type="date" id="aTo"   value="2026-03-28" onchange="renderAlle()" style="width:150px;">
+      <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:20px;">
+        <div class="fg" style="min-width:160px;">
+          <label for="aEmpF">Mitarbeiter</label>
+          <select id="aEmpF" onchange="renderAlle()"><option value="">Alle</option></select>
+        </div>
+        <div class="fg">
+          <label for="aFrom">Von</label>
+          <input type="date" id="aFrom" onchange="renderAlle()" style="width:150px;">
+        </div>
+        <div class="fg">
+          <label for="aTo">Bis</label>
+          <input type="date" id="aTo" onchange="renderAlle()" style="width:150px;">
+        </div>
+        <div class="fg" style="min-width:160px;">
+          <label for="aCustF">Kunde</label>
+          <select id="aCustF" onchange="renderAlle()"><option value="">Alle</option></select>
+        </div>
+        <div class="fg" style="min-width:160px;">
+          <label for="aWtF">Arbeitsart</label>
+          <select id="aWtF" onchange="renderAlle()"><option value="">Alle</option></select>
+        </div>
         <div style="flex:1;"></div>
         <button class="btn btn-p" onclick="openAdd()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -821,10 +1050,13 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       <div class="card">
         <div class="card-header">
           <div class="card-title">Zeiteinträge</div>
-          <span class="badge bo" id="aCount">0</span>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span class="badge bo" id="aHoursTotal">0,0 h</span>
+            <span class="badge bo" id="aCount">0</span>
+          </div>
         </div>
         <table>
-          <thead><tr><th>Mitarbeiter</th><th>Datum</th><th>Von</th><th>Bis</th><th>Pause</th><th>Netto</th><th>Notiz</th><th></th></tr></thead>
+          <thead><tr><th>Mitarbeiter</th><th>Datum</th><th>Objekt</th><th>Arbeit</th><th>Stunden</th><th>Status</th><th>Bemerkung</th><th></th></tr></thead>
           <tbody id="aBody"></tbody>
         </table>
       </div>
@@ -833,10 +1065,41 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     <!-- ═══ RAPPORTE ═══ -->
     <div class="view" id="view-rapporte">
       <div class="rp-toolbar">
-        <button type="button" class="btn btn-g" onclick="shiftReportWeek(-1)">← Vorherige Woche</button>
-        <div class="rp-week-label" id="rpWeekLabel">KW —</div>
-        <button type="button" class="btn btn-g" onclick="shiftReportWeek(1)">Nächste Woche →</button>
+        <div class="rp-toolbar-row">
+          <div class="rp-mode-toggle" role="group" aria-label="Ansicht">
+            <button type="button" id="rpModeOpen" class="active" onclick="setReportMode('open')">Offene Stunden</button>
+            <button type="button" id="rpModeRange" onclick="setReportMode('range')">Zeitraum</button>
+          </div>
+          <div class="rp-fg">
+            <label for="rpCustomer">Kunde</label>
+            <select id="rpCustomer" onchange="onReportFilterChange()">
+              <option value="">Alle</option>
+            </select>
+          </div>
+          <div class="rp-fg">
+            <label for="rpWorkType">Arbeitsart</label>
+            <select id="rpWorkType" onchange="onReportFilterChange()">
+              <option value="">Alle</option>
+            </select>
+          </div>
+        </div>
+        <div class="rp-toolbar-row" id="rpRangeRow" style="display:none;">
+          <div class="rp-fg">
+            <label for="rpFrom">Von</label>
+            <input type="date" id="rpFrom" onchange="onReportFilterChange()">
+          </div>
+          <div class="rp-fg">
+            <label for="rpTo">Bis</label>
+            <input type="date" id="rpTo" onchange="onReportFilterChange()">
+          </div>
+          <div class="rp-presets">
+            <button type="button" class="btn btn-g" onclick="setReportPreset('thisWeek')">Diese Woche</button>
+            <button type="button" class="btn btn-g" onclick="setReportPreset('lastWeek')">Letzte Woche</button>
+            <button type="button" class="btn btn-g" onclick="setReportPreset('thisMonth')">Dieser Monat</button>
+          </div>
+        </div>
       </div>
+      <div class="rp-filter-summary" id="rpFilterSummary"></div>
       <div id="rpBody"></div>
     </div>
 
@@ -863,16 +1126,16 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       <input type="date" id="eDate">
     </div>
     <div class="fg" style="margin-bottom:14px;">
+      <label>Arbeit / Absenz</label>
+      <select id="eWorkType" onchange="onEntryWorkTypeChange()"></select>
+    </div>
+    <div class="fg" style="margin-bottom:14px;" id="eSiteFg">
       <label>Objekt</label>
       <select id="eSite"></select>
     </div>
     <div class="fg" style="margin-bottom:14px;">
-      <label>Arbeit</label>
-      <select id="eWorkType"></select>
-    </div>
-    <div class="fg" style="margin-bottom:14px;">
-      <label>Stunden</label>
-      <input type="number" id="eHours" min="0.5" max="24" step="0.5" value="8">
+      <label id="eHoursLabel">Stunden</label>
+      <input type="number" id="eHours" min="0.5" max="16" step="0.5" value="8">
     </div>
     <div class="fg" style="margin-bottom:14px;">
       <label>Bemerkung (optional)</label>
@@ -978,6 +1241,38 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   </div>
 </div>
 
+<!-- MODAL: EINTRAG BESTÄTIGEN (Tages-Total / Duplikat) -->
+<div class="mo" id="moEntryConfirm">
+  <div class="mo-box">
+    <h3 style="margin:0 0 8px;font-size:18px;font-weight:800;">Eintrag prüfen</h3>
+    <p style="margin:0 0 14px;font-size:13px;color:var(--t2);line-height:1.45;">
+      Bitte bestätigen Sie, bevor der Eintrag gespeichert wird.
+    </p>
+    <div id="entryConfirmBody" style="font-size:14px;line-height:1.55;margin-bottom:16px;"></div>
+    <p id="entryConfirmErr" style="color:var(--red);font-size:13px;margin:0 0 12px;display:none;"></p>
+    <div class="mo-actions">
+      <button type="button" class="btn btn-g" onclick="closeM('moEntryConfirm')">Abbrechen</button>
+      <button type="button" class="btn btn-p" id="entryConfirmBtn" onclick="confirmSaveEntry()">Trotzdem speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: RECHNUNG BESTÄTIGEN -->
+<div class="mo" id="moRpInvoice">
+  <div class="mo-box">
+    <h3 style="margin:0 0 8px;font-size:18px;font-weight:800;">Rechnung bestätigen</h3>
+    <p style="margin:0 0 14px;font-size:13px;color:var(--t2);line-height:1.45;">
+      Prüfen Sie die Auswahl. Die Rechnung wird erst nach Bestätigung erstellt — genau mit den unten gelisteten Stunden.
+    </p>
+    <div id="rpInvConfirmBody" style="font-size:14px;line-height:1.55;margin-bottom:16px;"></div>
+    <p id="rpInvConfirmErr" style="color:var(--red);font-size:13px;margin:0 0 12px;display:none;"></p>
+    <div class="mo-actions">
+      <button type="button" class="btn btn-g" onclick="closeM('moRpInvoice')">Abbrechen</button>
+      <button type="button" class="btn btn-p" id="rpInvConfirmBtn" onclick="confirmCreateReportInvoice()">Rechnung erstellen</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -985,6 +1280,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 </div>
 
 <script src="/iso-week.js"></script>
+<script src="/entry-limits.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

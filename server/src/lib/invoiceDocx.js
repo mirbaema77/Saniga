@@ -13,19 +13,12 @@ const {
   VerticalAlign,
 } = require('docx');
 const {
-  HOURLY_RATE_CHF,
   formatSwissAmount,
   formatHoursQty,
   buildInvoiceView,
 } = require('./invoiceMath');
 const { loadLogoPng } = require('./invoiceLogo');
-
-/** A4 content width in DXA (twips) with ~20mm side margins. */
-const PAGE_CONTENT_DXA = 9638;
-const COL_ARBEIT = 5000;
-const COL_MENGE = 1400;
-const COL_PREIS = 1400;
-const COL_TOTAL = 1838;
+const { PAGE_CONTENT_DXA, DOCX_COLS, DOCX_COL_WIDTHS } = require('./invoiceLayout');
 
 const noBorder = {
   top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
@@ -52,7 +45,7 @@ function cell(text, opts = {}) {
   const {
     bold = false,
     align = AlignmentType.LEFT,
-    width = 2340,
+    width = DOCX_COLS.arbeit,
     borders = noBorder,
     color = '152830',
     size = 20,
@@ -89,12 +82,11 @@ function emptyCell(width, borders = noBorder) {
 /**
  * @returns {Promise<Buffer>}
  */
-async function renderInvoiceDocx(invoice) {
-  const view = buildInvoiceView(invoice);
+async function renderInvoiceDocx(invoice, company = null) {
+  const view = buildInvoiceView(invoice, company);
   const logoBuf = loadLogoPng();
   const children = [];
 
-  // Logo top-right (~55mm wide). Asset is tight-cropped 3x SVG export (370×100).
   children.push(
     new Paragraph({
       alignment: AlignmentType.RIGHT,
@@ -103,17 +95,16 @@ async function renderInvoiceDocx(invoice) {
         new ImageRun({
           type: 'png',
           data: logoBuf,
-          transformation: { width: 208, height: 56 },
-          altText: { title: 'Saniga', description: 'Saniga Logo', name: 'logo-saniga' },
+          transformation: { width: 208, height: 40 },
+          altText: { title: 'Saniga AG', description: 'Saniga AG Logo', name: 'logo-saniga' },
         }),
       ],
     })
   );
 
-  // Recipient + Hinwil date: left edge ~55% of content width
   const leftSpacer = Math.round(PAGE_CONTENT_DXA * 0.55);
   const rightCol = PAGE_CONTENT_DXA - leftSpacer;
-  const recipientLines = view.recipientLines || [view.customerName || '', '', ''];
+  const recipientLines = view.recipientLines || ['', '', ''];
 
   const recipientParas = [
     ...recipientLines.map(
@@ -128,7 +119,7 @@ async function renderInvoiceDocx(invoice) {
       alignment: AlignmentType.RIGHT,
       children: [
         new TextRun({
-          text: `Hinwil, ${view.issueDateLabel}`,
+          text: `${view.issuePlaceLabel}, ${view.issueDateLabel}`,
           size: 20,
           font: 'Calibri',
           color: '152830',
@@ -195,25 +186,25 @@ async function renderInvoiceDocx(invoice) {
   const tableRows = [
     new TableRow({
       children: [
-        cell('Arbeit', { bold: true, width: COL_ARBEIT, borders: topRule, size: 18 }),
+        cell('Arbeit', { bold: true, width: DOCX_COLS.arbeit, borders: topRule, size: 18 }),
         cell('Menge', {
           bold: true,
           align: AlignmentType.RIGHT,
-          width: COL_MENGE,
+          width: DOCX_COLS.menge,
           borders: topRule,
           size: 18,
         }),
         cell('Preis', {
           bold: true,
           align: AlignmentType.RIGHT,
-          width: COL_PREIS,
+          width: DOCX_COLS.preis,
           borders: topRule,
           size: 18,
         }),
         cell('Total', {
           bold: true,
           align: AlignmentType.RIGHT,
-          width: COL_TOTAL,
+          width: DOCX_COLS.total,
           borders: topRule,
           size: 18,
         }),
@@ -225,10 +216,10 @@ async function renderInvoiceDocx(invoice) {
     tableRows.push(
       new TableRow({
         children: [
-          cell(`${group.workTypeLabel}:`, { bold: true, width: COL_ARBEIT }),
-          emptyCell(COL_MENGE),
-          emptyCell(COL_PREIS),
-          emptyCell(COL_TOTAL),
+          cell(`${group.workTypeLabel}:`, { bold: true, width: DOCX_COLS.arbeit }),
+          emptyCell(DOCX_COLS.menge),
+          emptyCell(DOCX_COLS.preis),
+          emptyCell(DOCX_COLS.total),
         ],
       })
     );
@@ -236,18 +227,18 @@ async function renderInvoiceDocx(invoice) {
       tableRows.push(
         new TableRow({
           children: [
-            cell(`  ${emp.employeeName}`, { width: COL_ARBEIT }),
+            cell(`  ${emp.employeeName}`, { width: DOCX_COLS.arbeit }),
             cell(`${formatHoursQty(emp.hours)} h`, {
               align: AlignmentType.RIGHT,
-              width: COL_MENGE,
+              width: DOCX_COLS.menge,
             }),
-            cell(formatSwissAmount(HOURLY_RATE_CHF), {
+            cell(formatSwissAmount(emp.chfPerHour), {
               align: AlignmentType.RIGHT,
-              width: COL_PREIS,
+              width: DOCX_COLS.preis,
             }),
             cell(formatSwissAmount(emp.amount), {
               align: AlignmentType.RIGHT,
-              width: COL_TOTAL,
+              width: DOCX_COLS.total,
             }),
           ],
         })
@@ -258,10 +249,10 @@ async function renderInvoiceDocx(invoice) {
   tableRows.push(
     new TableRow({
       children: [
-        emptyCell(COL_ARBEIT, bottomRule),
-        emptyCell(COL_MENGE, bottomRule),
-        emptyCell(COL_PREIS, bottomRule),
-        emptyCell(COL_TOTAL, bottomRule),
+        emptyCell(DOCX_COLS.arbeit, bottomRule),
+        emptyCell(DOCX_COLS.menge, bottomRule),
+        emptyCell(DOCX_COLS.preis, bottomRule),
+        emptyCell(DOCX_COLS.total, bottomRule),
       ],
     })
   );
@@ -274,13 +265,13 @@ async function renderInvoiceDocx(invoice) {
     tableRows.push(
       new TableRow({
         children: [
-          cell(t.label, { bold: t.bold, width: COL_ARBEIT, size: t.bold ? 22 : 20 }),
-          emptyCell(COL_MENGE),
-          emptyCell(COL_PREIS),
+          cell(t.label, { bold: t.bold, width: DOCX_COLS.arbeit, size: t.bold ? 22 : 20 }),
+          emptyCell(DOCX_COLS.menge),
+          emptyCell(DOCX_COLS.preis),
           cell(`CHF ${formatSwissAmount(t.amount)}`, {
             bold: t.bold,
             align: AlignmentType.RIGHT,
-            width: COL_TOTAL,
+            width: DOCX_COLS.total,
             size: t.bold ? 22 : 20,
           }),
         ],
@@ -291,7 +282,7 @@ async function renderInvoiceDocx(invoice) {
   children.push(
     new Table({
       width: { size: PAGE_CONTENT_DXA, type: WidthType.DXA },
-      columnWidths: [COL_ARBEIT, COL_MENGE, COL_PREIS, COL_TOTAL],
+      columnWidths: DOCX_COL_WIDTHS,
       rows: tableRows,
     })
   );

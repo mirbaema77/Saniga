@@ -8,12 +8,14 @@ const router = express.Router();
 const createSchema = z.object({
   customerId: z.string().min(1),
   label: z.string().min(1).max(200),
+  objectNumber: z.string().max(100).optional().nullable(),
   address: z.string().max(500).optional().nullable(),
 });
 
 const patchSchema = z.object({
   customerId: z.string().min(1).optional(),
   label: z.string().min(1).max(200).optional(),
+  objectNumber: z.string().max(100).optional().nullable(),
   address: z.string().max(500).optional().nullable(),
   active: z.boolean().optional(),
 });
@@ -47,6 +49,7 @@ router.post('/', requireAdmin, async (req, res) => {
     data: {
       customerId: body.customerId,
       label: body.label.trim(),
+      objectNumber: body.objectNumber?.trim() || null,
       address: body.address?.trim() || null,
     },
     include: { customer: true },
@@ -72,6 +75,10 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   const data = {};
   if (parsed.data.customerId !== undefined) data.customerId = parsed.data.customerId;
   if (parsed.data.label !== undefined) data.label = parsed.data.label.trim();
+  if (parsed.data.objectNumber !== undefined) {
+    data.objectNumber =
+      parsed.data.objectNumber === null ? null : parsed.data.objectNumber.trim() || null;
+  }
   if (parsed.data.address !== undefined) {
     data.address = parsed.data.address === null ? null : parsed.data.address.trim() || null;
   }

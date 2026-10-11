@@ -17,6 +17,7 @@ const createSchema = z.object({
   jobTitle: z.string().max(120).optional(),
   hourlyRate: z.coerce.number().min(0).max(500).optional(),
   weeklyHours: z.coerce.number().int().min(1).max(60).optional(),
+  isTimeTracked: z.boolean().optional(),
 });
 
 const patchSchema = z.object({
@@ -24,15 +25,17 @@ const patchSchema = z.object({
   lastName: z.string().min(1).max(80).optional(),
   jobTitle: z.string().max(120).optional(),
   hourlyRate: z.coerce.number().min(0).max(500).optional(),
-  weeklyHours: z.coerce.number().int().min(1).max(60).optional(),
+  weeklyHours: z.coerce.number().int().min(0).max(60).optional(),
+  isTimeTracked: z.boolean().optional(),
   avatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 });
 
 router.use(requireAuth);
 
-router.get('/', requireAdmin, async (req, res) => {
+/** Time-tracked users (employees and admins who work on site). */
+router.get('/', requireAdmin, async (_req, res) => {
   const users = await prisma.user.findMany({
-    where: { role: 'EMPLOYEE' },
+    where: { isTimeTracked: true },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   });
   res.json({ employees: users.map(toPublicUser) });
@@ -61,6 +64,7 @@ router.post('/', requireAdmin, async (req, res) => {
       jobTitle: body.jobTitle?.trim() || 'Mitarbeiter',
       hourlyRate: body.hourlyRate ?? 35,
       weeklyHours: body.weeklyHours ?? 45,
+      isTimeTracked: body.isTimeTracked !== false,
       avatarColor: COLS[count % COLS.length],
     },
   });
@@ -73,7 +77,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'Ungültige Eingabe', details: parsed.error.flatten() });
   }
   const target = await prisma.user.findUnique({ where: { id: req.params.id } });
-  if (!target || target.role !== 'EMPLOYEE') {
+  if (!target) {
     return res.status(404).json({ error: 'Mitarbeiter nicht gefunden' });
   }
   const data = {};
@@ -82,6 +86,7 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   if (parsed.data.jobTitle !== undefined) data.jobTitle = parsed.data.jobTitle.trim();
   if (parsed.data.hourlyRate !== undefined) data.hourlyRate = parsed.data.hourlyRate;
   if (parsed.data.weeklyHours !== undefined) data.weeklyHours = parsed.data.weeklyHours;
+  if (parsed.data.isTimeTracked !== undefined) data.isTimeTracked = parsed.data.isTimeTracked;
   if (parsed.data.avatarColor !== undefined) data.avatarColor = parsed.data.avatarColor;
   const user = await prisma.user.update({ where: { id: target.id }, data });
   res.json({ employee: toPublicUser(user) });

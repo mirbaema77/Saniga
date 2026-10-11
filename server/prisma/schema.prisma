@@ -13,21 +13,25 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  role         Role
-  firstName    String
-  lastName     String
-  jobTitle     String   @default("Mitarbeiter")
-  hourlyRate   Decimal  @default(35) @db.Decimal(10, 2)
-  weeklyHours  Int      @default(45)
-  avatarColor  String   @default("#12B8E1")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  entries      TimeEntry[]
+  id            String        @id @default(cuid())
+  email         String        @unique
+  passwordHash  String
+  role          Role
+  firstName     String
+  lastName      String
+  jobTitle      String        @default("Mitarbeiter")
+  hourlyRate    Decimal       @default(35) @db.Decimal(10, 2)
+  weeklyHours   Int           @default(45)
+  isTimeTracked Boolean       @default(true)
+  avatarColor   String        @default("#12B8E1")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  entries       TimeEntry[]
+  rates         Rate[]
+  invoiceLines  InvoiceLine[]
 
   @@index([role])
+  @@index([isTimeTracked])
 }
 
 model TimeEntry {
@@ -54,32 +58,40 @@ model TimeEntry {
 }
 
 model Customer {
-  id        String    @id @default(cuid())
-  name      String
-  address   String?
-  sites     Site[]
-  invoices  Invoice[]
-  createdAt DateTime  @default(now())
+  id              String    @id @default(cuid())
+  name            String
+  street          String?
+  postalCode      String?
+  city            String?
+  contactPerson   String?
+  paymentTermDays Int       @default(14)
+  sites           Site[]
+  invoices        Invoice[]
+  rates           Rate[]
+  createdAt       DateTime  @default(now())
 }
 
 model Site {
-  id         String      @id @default(cuid())
-  customerId String
-  customer   Customer    @relation(fields: [customerId], references: [id])
-  label      String
-  address    String?
-  active     Boolean     @default(true)
-  createdAt  DateTime    @default(now())
-  entries    TimeEntry[]
-  invoices   Invoice[]
+  id           String      @id @default(cuid())
+  customerId   String
+  customer     Customer    @relation(fields: [customerId], references: [id])
+  label        String
+  objectNumber String?
+  address      String?
+  active       Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  entries      TimeEntry[]
+  invoices     Invoice[]
 }
 
 model WorkType {
-  id       String      @id @default(cuid())
-  label    String
-  billable Boolean     @default(true)
-  active   Boolean     @default(true)
-  entries  TimeEntry[]
+  id           String        @id @default(cuid())
+  label        String
+  billable     Boolean       @default(true)
+  active       Boolean       @default(true)
+  entries      TimeEntry[]
+  rates        Rate[]
+  invoiceLines InvoiceLine[]
 }
 
 model Invitation {
@@ -97,16 +109,81 @@ model Invitation {
 }
 
 model Invoice {
-  id         String      @id @default(cuid())
-  number     String      @unique
-  customerId String
-  customer   Customer    @relation(fields: [customerId], references: [id])
-  siteId     String
-  site       Site        @relation(fields: [siteId], references: [id])
-  issueDate  DateTime
-  periodFrom DateTime
-  periodTo   DateTime
-  vatRate    Decimal     @db.Decimal(4, 2)
-  entries    TimeEntry[]
-  createdAt  DateTime    @default(now())
+  id              String                @id @default(cuid())
+  number          String                @unique
+  customerId      String
+  customer        Customer              @relation(fields: [customerId], references: [id])
+  siteId          String
+  site            Site                  @relation(fields: [siteId], references: [id])
+  issueDate       DateTime
+  periodFrom      DateTime
+  periodTo        DateTime
+  vatRate         Decimal               @db.Decimal(4, 2)
+  cancelledAt     DateTime?
+  cancelledReason String?
+  entries         TimeEntry[]
+  lines           InvoiceLine[]
+  downloadLinks   InvoiceDownloadLink[]
+  createdAt       DateTime              @default(now())
+}
+
+/** Short-lived, single-use key for PDF/Word download (no session JWT in URL). */
+model InvoiceDownloadLink {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  invoiceId String
+  invoice   Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  format    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([invoiceId])
+  @@index([expiresAt])
+}
+
+model InvoiceLine {
+  id         String    @id @default(cuid())
+  invoiceId  String
+  invoice    Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  workTypeId String?
+  workType   WorkType? @relation(fields: [workTypeId], references: [id])
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id])
+  hours      Decimal   @db.Decimal(8, 2)
+  chfPerHour Decimal   @db.Decimal(8, 2)
+  total      Decimal   @db.Decimal(12, 2)
+
+  @@index([invoiceId])
+}
+
+/** Selling price to customer (not User.hourlyRate wage). Null dims = wildcard. */
+model Rate {
+  id         String    @id @default(cuid())
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  workTypeId String?
+  workType   WorkType? @relation(fields: [workTypeId], references: [id])
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id])
+  chfPerHour Decimal   @db.Decimal(8, 2)
+  validFrom  DateTime
+  validTo    DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId, workTypeId, userId])
+  @@index([validFrom, validTo])
+}
+
+/** Single-row company / letterhead settings. */
+model Company {
+  id                 String   @id @default("default")
+  name               String
+  street             String?
+  postalCode         String?
+  city               String?
+  uid                String?
+  vatRate            Decimal  @default(8.10) @db.Decimal(4, 2)
+  invoiceStartNumber Int      @default(1)
+  updatedAt          DateTime @updatedAt
 }

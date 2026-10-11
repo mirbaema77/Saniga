@@ -94,10 +94,10 @@ def ensure_env() -> None:
 JWT_SECRET="{secret}"
 ADMIN_EMAIL="admin@local.test"
 ADMIN_PASSWORD="admin123"
-EMPLOYEE_INVITE_CODE="DEMO"
+CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
 """
     ENV_FILE.write_text(body, encoding="utf-8")
-    print(f"Created {ENV_FILE} (admin: admin@local.test / admin123, invite code: DEMO)\n")
+    print(f"Created {ENV_FILE} (admin: admin@local.test / admin123)\n")
 
 
 def main() -> None:

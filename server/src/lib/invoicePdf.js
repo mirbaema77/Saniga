@@ -1,20 +1,19 @@
 const PDFDocument = require('pdfkit');
 const {
-  HOURLY_RATE_CHF,
   formatSwissAmount,
   formatHoursQty,
   buildInvoiceView,
 } = require('./invoiceMath');
 const {
-  MM,
-  MARGIN_X,
   MARGIN_TOP,
   MARGIN_RIGHT,
-  LOGO_W,
-  LOGO_H,
+  LOGO_BOX_W,
+  LOGO_BOX_H,
   RECIPIENT_LEFT,
   loadLogoPng,
+  logoImageOptions,
 } = require('./invoiceLogo');
+const { CONTENT_RIGHT, CONTENT_WIDTH, PDF_COLS, MM, MARGIN_X } = require('./invoiceLayout');
 
 function paintWhitePage(doc) {
   const { width, height } = doc.page;
@@ -23,11 +22,20 @@ function paintWhitePage(doc) {
   doc.restore();
 }
 
+function drawColText(doc, col, text, y, { bold = false, size = 10 } = {}) {
+  doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(size).fillColor('#152830');
+  doc.text(String(text ?? ''), col.x, y, {
+    width: col.width,
+    align: col.align,
+    lineBreak: false,
+  });
+}
+
 /**
  * @returns {Promise<Buffer>}
  */
-function renderInvoicePdf(invoice) {
-  const view = buildInvoiceView(invoice);
+function renderInvoicePdf(invoice, company = null) {
+  const view = buildInvoiceView(invoice, company);
   const logo = loadLogoPng();
 
   return new Promise((resolve, reject) => {
@@ -45,8 +53,6 @@ function renderInvoicePdf(invoice) {
 
     const pageWidth = doc.page.width;
     const pageHeight = doc.page.height;
-    const contentRight = pageWidth - MARGIN_RIGHT;
-    const contentWidth = contentRight - MARGIN_X;
 
     const ensureSpace = (needY) => {
       if (needY <= pageHeight - 20 * MM) return;
@@ -55,15 +61,13 @@ function renderInvoicePdf(invoice) {
       return true;
     };
 
-    // Logo top-right: 55mm wide, 15mm from top and right edges
-    const logoX = pageWidth - MARGIN_RIGHT - LOGO_W;
+    const logoX = pageWidth - MARGIN_RIGHT - LOGO_BOX_W;
     const logoY = MARGIN_TOP;
-    doc.image(logo, logoX, logoY, { width: LOGO_W, height: LOGO_H });
+    doc.image(logo, logoX, logoY, logoImageOptions());
 
-    // Recipient: 3 lines (name, street, PLZ Ort), right-aligned from ~55% width
     const recipientLeft = RECIPIENT_LEFT;
-    const recipientWidth = contentRight - recipientLeft;
-    let y = logoY + LOGO_H + 10 * MM;
+    const recipientWidth = CONTENT_RIGHT - recipientLeft;
+    let y = logoY + LOGO_BOX_H + 10 * MM;
 
     doc.font('Helvetica').fontSize(10).fillColor('#152830');
     for (const line of view.recipientLines) {
@@ -74,24 +78,21 @@ function renderInvoicePdf(invoice) {
       y = doc.y;
     }
 
-    // "Hinwil, date" below recipient, same left edge
     y += 8 * MM;
     doc.fillColor('#152830').fontSize(10);
-    doc.text(`Hinwil, ${view.issueDateLabel}`, recipientLeft, y, {
+    doc.text(`${view.issuePlaceLabel}, ${view.issueDateLabel}`, recipientLeft, y, {
       width: recipientWidth,
       align: 'right',
     });
     y = doc.y + 10 * MM;
 
-    // Title left-aligned on page margin
     doc.font('Helvetica-Bold').fontSize(14).fillColor('#152830');
-    doc.text(`Rechnung ${view.number}`, MARGIN_X, y, { width: contentWidth, align: 'left' });
+    doc.text(`Rechnung ${view.number}`, MARGIN_X, y, { width: CONTENT_WIDTH, align: 'left' });
     y = doc.y + 6 * MM;
 
-    // Meta: two-column label / value
     const labelColW = 45 * MM;
     const valueColX = MARGIN_X + labelColW;
-    const valueColW = contentWidth - labelColW;
+    const valueColW = CONTENT_WIDTH - labelColW;
     doc.fontSize(10);
     for (const row of view.metaRows) {
       const rowY = y;
@@ -108,45 +109,37 @@ function renderInvoicePdf(invoice) {
 
     y += 8 * MM;
 
-    const colArbeit = MARGIN_X;
-    const colMenge = MARGIN_X + contentWidth * 0.52;
-    const colPreis = MARGIN_X + contentWidth * 0.68;
-    const colTotal = MARGIN_X + contentWidth * 0.82;
-    const mengeW = colPreis - colMenge - 4;
-    const preisW = colTotal - colPreis - 4;
-    const totalW = contentRight - colTotal;
-
     doc
       .moveTo(MARGIN_X, y)
-      .lineTo(contentRight, y)
+      .lineTo(CONTENT_RIGHT, y)
       .strokeColor('#152830')
       .lineWidth(0.8)
       .stroke();
     y += 6;
 
-    doc.font('Helvetica-Bold').fontSize(9).fillColor('#152830');
-    doc.text('Arbeit', colArbeit, y, { width: colMenge - colArbeit - 6 });
-    doc.text('Menge', colMenge, y, { width: mengeW, align: 'right' });
-    doc.text('Preis', colPreis, y, { width: preisW, align: 'right' });
-    doc.text('Total', colTotal, y, { width: totalW, align: 'right' });
+    drawColText(doc, PDF_COLS.arbeit, 'Arbeit', y, { bold: true, size: 9 });
+    drawColText(doc, PDF_COLS.menge, 'Menge', y, { bold: true, size: 9 });
+    drawColText(doc, PDF_COLS.preis, 'Preis', y, { bold: true, size: 9 });
+    drawColText(doc, PDF_COLS.total, 'Total', y, { bold: true, size: 9 });
     y += 14;
 
-    doc.font('Helvetica').fontSize(10);
     for (const group of view.lineItems) {
       if (ensureSpace(y + 40)) y = MARGIN_TOP;
-      doc.font('Helvetica-Bold').fillColor('#152830').text(`${group.workTypeLabel}:`, colArbeit, y, {
-        width: colMenge - colArbeit - 6,
-      });
+      drawColText(doc, PDF_COLS.arbeit, `${group.workTypeLabel}:`, y, { bold: true, size: 10 });
       y = doc.y + 4;
-      doc.font('Helvetica').fillColor('#152830');
       for (const emp of group.employees) {
         if (ensureSpace(y + 20)) y = MARGIN_TOP;
         const rowY = y;
-        doc.text(emp.employeeName, colArbeit + 8, rowY, { width: colMenge - colArbeit - 14 });
-        doc.text(`${formatHoursQty(emp.hours)} h`, colMenge, rowY, { width: mengeW, align: 'right' });
-        doc.text(formatSwissAmount(HOURLY_RATE_CHF), colPreis, rowY, { width: preisW, align: 'right' });
-        doc.text(formatSwissAmount(emp.amount), colTotal, rowY, { width: totalW, align: 'right' });
-        y = Math.max(doc.y, rowY + 13) + 1;
+        doc.font('Helvetica').fontSize(10).fillColor('#152830');
+        doc.text(emp.employeeName, PDF_COLS.arbeit.x + 8, rowY, {
+          width: PDF_COLS.arbeit.width - 8,
+          align: 'left',
+          lineBreak: false,
+        });
+        drawColText(doc, PDF_COLS.menge, `${formatHoursQty(emp.hours)} h`, rowY, { size: 10 });
+        drawColText(doc, PDF_COLS.preis, formatSwissAmount(emp.chfPerHour), rowY, { size: 10 });
+        drawColText(doc, PDF_COLS.total, formatSwissAmount(emp.amount), rowY, { size: 10 });
+        y = rowY + 13;
       }
       y += 4;
     }
@@ -154,7 +147,7 @@ function renderInvoicePdf(invoice) {
     y += 4;
     doc
       .moveTo(MARGIN_X, y)
-      .lineTo(contentRight, y)
+      .lineTo(CONTENT_RIGHT, y)
       .strokeColor('#152830')
       .lineWidth(0.8)
       .stroke();
@@ -163,9 +156,11 @@ function renderInvoicePdf(invoice) {
     const drawTotalRow = (label, amount, { bold = false } = {}) => {
       if (ensureSpace(y + 20)) y = MARGIN_TOP;
       const rowY = y;
-      doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 11 : 10).fillColor('#152830');
-      doc.text(label, colArbeit, rowY, { width: colTotal - colArbeit - 8 });
-      doc.text(`CHF ${formatSwissAmount(amount)}`, colTotal, rowY, { width: totalW, align: 'right' });
+      drawColText(doc, PDF_COLS.arbeit, label, rowY, { bold, size: bold ? 11 : 10 });
+      drawColText(doc, PDF_COLS.total, `CHF ${formatSwissAmount(amount)}`, rowY, {
+        bold,
+        size: bold ? 11 : 10,
+      });
       y = rowY + (bold ? 16 : 14);
     };
 
@@ -177,7 +172,7 @@ function renderInvoicePdf(invoice) {
     doc.font('Helvetica').fontSize(9).fillColor('#152830');
     for (const line of view.footerLines) {
       if (ensureSpace(y + 16)) y = MARGIN_TOP;
-      doc.text(line, MARGIN_X, y, { width: contentWidth, align: 'left' });
+      doc.text(line, MARGIN_X, y, { width: CONTENT_WIDTH, align: 'left' });
       y = doc.y + 3;
     }
 

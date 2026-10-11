@@ -8,7 +8,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
-const { ensureAdmin } = require('./bootstrap');
+const { bootstrap } = require('./bootstrap');
 const authRoutes = require('./routes/auth');
 const employeesRoutes = require('./routes/employees');
 const entriesRoutes = require('./routes/entries');
@@ -18,15 +18,40 @@ const workTypesRoutes = require('./routes/workTypes');
 const reportsRoutes = require('./routes/reports');
 const invitationsRoutes = require('./routes/invitations');
 const invoicesRoutes = require('./routes/invoices');
+const ratesRoutes = require('./routes/rates');
+const companyRoutes = require('./routes/company');
+const exportsRoutes = require('./routes/exports');
+const dashboardRoutes = require('./routes/dashboard');
 
 const app = express();
 const PORT = Number(process.env.PORT, 10) || 3000;
 
 const publicDir = path.join(__dirname, '..', 'public');
 
+function corsAllowlist() {
+  const raw = (process.env.CORS_ORIGINS || '').trim();
+  if (raw) {
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    return [`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`];
+  }
+  return ['http://localhost:3000', 'http://127.0.0.1:3000'];
+}
+
+const allowedOrigins = corsAllowlist();
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : true,
+    origin(origin, callback) {
+      // Same-origin / non-browser clients send no Origin header.
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
     credentials: true,
   })
 );
@@ -54,6 +79,10 @@ app.use('/api/work-types', workTypesRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/invitations', invitationsRoutes);
 app.use('/api/invoices', invoicesRoutes);
+app.use('/api/rates', ratesRoutes);
+app.use('/api/company', companyRoutes);
+app.use('/api/exports', exportsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.use(
   express.static(publicDir, {
@@ -74,7 +103,7 @@ app.get('*', (req, res, next) => {
 });
 
 async function main() {
-  await ensureAdmin();
+  await bootstrap();
   app.listen(PORT, () => {
     console.log(`Saniga API listening on port ${PORT}`);
   });

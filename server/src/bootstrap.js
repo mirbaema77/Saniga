@@ -1,5 +1,7 @@
 const { prisma } = require('./lib/prisma');
 const { hashPassword } = require('./lib/password');
+const { ensureCompany } = require('./lib/company');
+const { ensureAbsenceWorkTypes } = require('./lib/absenceWorkTypes');
 
 async function ensureAdmin() {
   const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
@@ -31,4 +33,13 @@ async function ensureAdmin() {
   console.log(`[bootstrap] Created admin user: ${email}`);
 }
 
-module.exports = { ensureAdmin };
+async function bootstrap() {
+  await ensureCompany();
+  await ensureAdmin();
+  const abs = await ensureAbsenceWorkTypes(prisma);
+  if (abs.created.length) {
+    console.log(`[bootstrap] Absenz-Arbeitsarten angelegt: ${abs.created.join(', ')}`);
+  }
+}
+
+module.exports = { ensureAdmin, ensureCompany, bootstrap, ensureAbsenceWorkTypes };

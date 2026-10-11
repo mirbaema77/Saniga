@@ -12,7 +12,7 @@ Sample data lives in memory only until you refresh the page.
 
 ---
 
-Single-tenant time tracking: one **admin** account (full overview) and **employees** who self-register with a shared invite code, then log their hours.
+Single-tenant time tracking: one **admin** account (full overview) and **employees** who join via a personal invitation link, then log their hours.
 
 ## Project layout
 
@@ -40,14 +40,14 @@ On Windows, if `python` is not found, try:
 py run.py
 ```
 
-The script starts Postgres in Docker, creates `server/.env` on first run if missing, installs dependencies, runs migrations, and starts the app. Then open **http://localhost:3000** — default admin: `admin@local.test` / `admin123`, employee invite code on **http://localhost:3000/join.html**: `DEMO`.
+The script starts Postgres in Docker, creates `server/.env` on first run if missing, installs dependencies, runs migrations, and starts the app. Then open **http://localhost:3000** — default admin: `admin@local.test` / `admin123`. Invite employees from Team (personal `/join.html?token=…` link).
 
 Stop the database when finished: `docker compose down` in the same folder.
 
 ### Manual setup
 
 1. Install [Node.js 20+](https://nodejs.org/) and PostgreSQL (or use a cloud DB).
-2. Copy `server/.env.example` to `server/.env` and set `DATABASE_URL`, `JWT_SECRET` (≥16 chars), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `EMPLOYEE_INVITE_CODE`.
+2. Copy `server/.env.example` to `server/.env` and set `DATABASE_URL`, `JWT_SECRET` (≥16 chars), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and optionally `CORS_ORIGINS`.
 3. In a terminal:
 
 ```bash
@@ -57,7 +57,7 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000), log in as admin, then share `http://localhost:3000/join.html` plus the invite code with testers.
+4. Open [http://localhost:3000](http://localhost:3000), log in as admin, then invite employees from Team (personal join link).
 
 ## Deploy on Railway
 
@@ -68,22 +68,23 @@ npm run dev
    - `DATABASE_URL` — from the Postgres plugin (reference variable).
    - `JWT_SECRET` — long random string (≥16 characters).
    - `ADMIN_EMAIL` / `ADMIN_PASSWORD` — first admin is created on first deploy if no admin exists.
-   - `EMPLOYEE_INVITE_CODE` — secret code for `/join.html` registration.
-5. Deploy. Railway runs `npm run start` (`prisma migrate deploy` then `node src/index.js`).
-6. Use the generated public URL: main app `/`, employee onboarding `/join.html`.
+   - `CORS_ORIGINS` — comma-separated allowed origins, e.g. `https://your-app.up.railway.app` (if unset, defaults to `https://$RAILWAY_PUBLIC_DOMAIN`).
+5. **Remove** the obsolete variable `EMPLOYEE_INVITE_CODE` from Railway if it is still set (shared join code retired).
+6. Deploy. Railway runs `npm run start` (`prisma migrate deploy` then `node src/index.js`).
+7. Use the generated public URL: main app `/`, employee onboarding via personal `/join.html?token=…` links from Team.
 
 ## Security notes (MVP)
 
-- Use strong `JWT_SECRET`, `ADMIN_PASSWORD`, and `EMPLOYEE_INVITE_CODE` in production.
+- Use strong `JWT_SECRET` and `ADMIN_PASSWORD` in production.
 - Prefer HTTPS only (Railway provides TLS).
-- This MVP stores passwords with bcrypt; consider rate limiting and audit logs for production hardening.
+- Login and invitation acceptance are rate-limited per IP; set `CORS_ORIGINS` explicitly in production.
 
 ## API overview
 
 | Method | Path | Notes |
 |--------|------|--------|
-| POST | `/api/auth/login` | `{ email, password }` → JWT |
-| POST | `/api/auth/register-employee` | Requires `inviteCode` matching `EMPLOYEE_INVITE_CODE` |
+| POST | `/api/auth/login` | `{ email, password }` → JWT (rate-limited) |
+| POST | `/api/invitations/:token/accept` | Set password from personal invite (rate-limited) |
 | GET | `/api/auth/me` | Bearer JWT |
 | GET | `/api/employees` | Admin only |
 | POST | `/api/employees` | Admin creates employee (email + password + profile) |

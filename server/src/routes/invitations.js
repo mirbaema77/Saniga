@@ -6,8 +6,10 @@ const { hashPassword } = require('../lib/password');
 const { signToken } = require('../lib/jwt');
 const { toPublicUser } = require('../lib/userDto');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { authRateLimiter } = require('../lib/rateLimit');
 
 const router = express.Router();
+const acceptLimiter = authRateLimiter({ max: 20 });
 
 const COLS = ['#12B8E1', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#64748b'];
 
@@ -20,6 +22,7 @@ const createSchema = z.object({
   weeklyHours: z.coerce.number().int().min(1).max(60).optional(),
 });
 
+/** Only password is accepted from the client; profile fields come from Invitation. */
 const acceptSchema = z.object({
   password: z.string().min(8, 'Passwort mindestens 8 Zeichen'),
 });
@@ -85,7 +88,7 @@ router.get('/:token', async (req, res) => {
   });
 });
 
-router.post('/:token/accept', async (req, res) => {
+router.post('/:token/accept', acceptLimiter, async (req, res) => {
   const parsed = acceptSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Ungültige Eingabe', details: parsed.error.flatten() });
@@ -108,6 +111,7 @@ router.post('/:token/accept', async (req, res) => {
     return res.status(409).json({ error: 'Diese E-Mail ist bereits registriert' });
   }
 
+  // Ignore any client-supplied hourlyRate / weeklyHours / role / isTimeTracked.
   const count = await prisma.user.count();
   const passwordHash = await hashPassword(parsed.data.password);
   const user = await prisma.$transaction(async (tx) => {
@@ -121,6 +125,7 @@ router.post('/:token/accept', async (req, res) => {
         jobTitle: invitation.jobTitle || 'Mitarbeiter',
         hourlyRate: invitation.hourlyRate,
         weeklyHours: invitation.weeklyHours,
+        isTimeTracked: true,
         avatarColor: COLS[count % COLS.length],
       },
     });

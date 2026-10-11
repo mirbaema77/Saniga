@@ -7,13 +7,21 @@ let ENTRIES = [];
 let CUSTOMERS = [];
 let SITES = [];
 let WORK_TYPES = [];
+let COMPANY = null;
+let RATES = [];
 let editId = null;
 let curUser = '';
 let teamSelEmpId = null;
 let sdTab = 'kunden';
-let reportYear = null;
-let reportWeek = null;
+let reportMode = 'open';
+let reportFrom = '';
+let reportTo = '';
+let reportCustomerId = '';
+let reportWorkTypeId = '';
 let reportInvoiceFlash = null;
+let pendingReportInvoice = null;
+let lastReportsData = null;
+let pendingEntrySave = null;
 let entrySyncTimer = null;
 let entriesFingerprint = '';
 let suppressRemoteToastUntil = 0;
@@ -47,7 +55,12 @@ async function api(path, opts = {}) {
   } catch {
     data = { error: text || 'Ungültige Antwort' };
   }
-  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  if (!r.ok) {
+    const err = new Error(data.error || `HTTP ${r.status}`);
+    err.status = r.status;
+    err.data = data;
+    throw err;
+  }
   return data;
 }
 
@@ -57,10 +70,24 @@ function mapEmp(u) {
     first: u.firstName,
     last: u.lastName,
     role: u.jobTitle,
+    userRole: u.role || 'EMPLOYEE',
     rate: Number(u.hourlyRate),
     target: u.weeklyHours,
+    isTimeTracked: u.isTimeTracked !== false,
     color: u.avatarColor,
   };
+}
+
+/** Fallback if API omits the logged-in admin (should be included when isTimeTracked). */
+function ensureSelfInEmps() {
+  if (!IS_ADMIN || !ME) return;
+  if (EMPS.some((e) => e.id === ME.id)) return;
+  if (ME.isTimeTracked === false) return;
+  EMPS = [mapEmp(ME), ...EMPS];
+}
+
+function trackedEmps() {
+  return EMPS.filter((e) => e.isTimeTracked !== false);
 }
 
 function mapEntry(e) {
@@ -75,6 +102,10 @@ function mapEntry(e) {
     siteId: e.siteId || null,
     workTypeId: e.workTypeId || null,
     hours: e.hours == null ? null : Number(e.hours),
+    invoiceId: e.invoiceId || null,
+    invoiceNumber: e.invoiceNumber || null,
+    billable: e.billable !== false,
+    workTypeLabel: e.workTypeLabel || null,
   };
 }
 
@@ -137,6 +168,7 @@ async function pollRemoteEntries() {
       try {
         const emRes = await api('/employees');
         EMPS = emRes.employees.map(mapEmp);
+        ensureSelfInEmps();
         fillUserSwitcher();
       } catch {
         /* keep existing EMPS */
@@ -173,6 +205,7 @@ async function loadData() {
   if (IS_ADMIN) {
     const emRes = await api('/employees');
     EMPS = emRes.employees.map(mapEmp);
+    ensureSelfInEmps();
   } else {
     EMPS = [mapEmp(ME)];
   }
@@ -189,7 +222,8 @@ async function loadData() {
 
 function formatEmpSelectLabel(e) {
   if (!e) return '';
-  return `${e.first} ${e.last} (Mitarbeiter)`;
+  const tag = e.userRole === 'ADMIN' ? 'Admin' : 'Mitarbeiter';
+  return `${e.first} ${e.last} (${tag})`;
 }
 
 function fillUserSwitcher() {
@@ -200,7 +234,13 @@ function fillUserSwitcher() {
 }
 
 function fillMonthSelects() {
-  const sels = [document.getElementById('monSel'), document.getElementById('lMonSel'), document.getElementById('teamMonSel')];
+  const sels = [
+    document.getElementById('monSel'),
+    document.getElementById('lMonSel'),
+    document.getElementById('teamMonSel'),
+    document.getElementById('exMonSel'),
+    document.getElementById('absMonSel'),
+  ];
   const [zy, zm] = IsoWeek.zonedYmd(new Date()).split('-').map(Number);
   const opts = [];
   for (let i = 0; i < 18; i += 1) {
@@ -229,7 +269,7 @@ function applyRoleUI() {
     if (IS_ADMIN) el.classList.remove('hidden');
     else el.classList.add('hidden');
   });
-  syncLohnEditability();
+  // syncLohnEditability(); // payroll UI hidden — Treuhänder handles Lohn
 }
 
 function ge(id) {
@@ -255,8 +295,62 @@ function entrySiteLabel(en) {
 }
 
 function entryWorkLabel(en) {
+  if (en.workTypeLabel) return en.workTypeLabel;
   const wt = WORK_TYPES.find((w) => w.id === en.workTypeId);
   return wt ? wt.label : '';
+}
+
+function isAbsenceEntry(en) {
+  return en.billable === false;
+}
+
+function entryObjektCell(en) {
+  if (isAbsenceEntry(en)) {
+    return `${escapeAttr(entryWorkLabel(en) || 'Absenz')}<span class="entry-abs-badge">Absenz</span>`;
+  }
+  return escapeAttr(entrySiteLabel(en) || '—');
+}
+
+function entryHoursValue(en) {
+  if (en.hours != null && !Number.isNaN(Number(en.hours))) return Number(en.hours);
+  return Math.round((net(en) / 60) * 100) / 100;
+}
+
+function isLegacyEntry(en) {
+  return en.hours == null;
+}
+
+function isEntryInvoiced(en) {
+  return !!(en.invoiceId && en.invoiceNumber);
+}
+
+function entryStatusLabel(en) {
+  if (en.billable === false) return 'Nicht verrechenbar';
+  if (isEntryInvoiced(en)) return en.invoiceNumber;
+  return 'Offen';
+}
+
+function entryActionButtonsHtml(en) {
+  if (isEntryInvoiced(en)) {
+    const tip = escapeAttr(`Verrechnet auf Rechnung ${en.invoiceNumber}`);
+    return `<div style="display:flex;gap:6px;">
+      <div class="ib disabled" title="${tip}" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </div>
+      <div class="ib del disabled" title="${tip}" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </div>
+    </div>`;
+  }
+  const id = escapeAttr(en.id);
+  return `<div style="display:flex;gap:6px;">
+    <div class="ib" onclick="openEdit('${id}')" title="Bearbeiten">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    </div>
+    <div class="ib del" onclick="quickDel('${id}')" title="Löschen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+    </div>
+  </div>`;
 }
 
 function entryTimeLabel(en) {
@@ -352,10 +446,12 @@ const TITLES = {
   dashboard: 'Admin Dashboard',
   team: 'Team verwalten',
   stammdaten: 'Stammdaten',
-  lohn: 'Lohnabrechnung',
+  // lohn: 'Lohnabrechnung', // hidden — external Treuhänder
   alle: 'Alle Einträge',
   rapporte: 'Rapporte',
   rechnungen: 'Rechnungen',
+  stundenexport: 'Stundenexport',
+  absenzen: 'Absenzen',
 };
 
 function showView(n) {
@@ -380,13 +476,20 @@ function refreshView(n) {
   if (n === 'monat') renderMonat();
   if (n === 'dashboard' && IS_ADMIN) renderDash();
   if (n === 'team' && IS_ADMIN) renderTeam();
-  if (n === 'lohn') {
-    syncLohnEditability();
-    if (IS_ADMIN) {
-      renderPayrollRulesForm();
-      fillLohnSel();
-    }
-    renderLohn();
+  // Payroll view hidden (Treuhänder). Uncomment with nav/view to restore.
+  // if (n === 'lohn') {
+  //   syncLohnEditability();
+  //   if (IS_ADMIN) {
+  //     renderPayrollRulesForm();
+  //     fillLohnSel();
+  //   }
+  //   renderLohn();
+  // }
+  if (n === 'stundenexport' && IS_ADMIN) {
+    loadHoursExport();
+  }
+  if (n === 'absenzen' && IS_ADMIN) {
+    renderAbsenzen();
   }
   if (n === 'alle' && IS_ADMIN) {
     fillAlleSel();
@@ -403,66 +506,337 @@ function refreshView(n) {
   }
 }
 
-function shiftReportWeek(delta) {
-  if (reportYear == null || reportWeek == null) {
-    const cur = IsoWeek.getISOWeekParts(new Date());
-    reportYear = cur.year;
-    reportWeek = cur.week;
-  }
-  const next = IsoWeek.shiftIsoWeek(reportYear, reportWeek, delta);
-  reportYear = next.year;
-  reportWeek = next.week;
-  loadReports();
-}
-
 function formatReportHours(h) {
   return formatHours(h);
 }
 
+function ensureReportRangeDefaults() {
+  if (reportFrom && reportTo) return;
+  const cur = IsoWeek.getISOWeekParts(new Date());
+  const b = IsoWeek.isoWeekBounds(cur.year, cur.week);
+  reportFrom = b.from;
+  reportTo = b.to;
+}
+
+function fillReportFilterSelects() {
+  const custSel = document.getElementById('rpCustomer');
+  const wtSel = document.getElementById('rpWorkType');
+  if (custSel) {
+    const prev = reportCustomerId;
+    custSel.innerHTML =
+      `<option value="">Alle</option>` +
+      CUSTOMERS.map((c) => `<option value="${escapeAttr(c.id)}">${escapeAttr(c.name)}</option>`).join('');
+    custSel.value = prev || '';
+    reportCustomerId = custSel.value;
+  }
+  if (wtSel) {
+    const prev = reportWorkTypeId;
+    const types = WORK_TYPES.filter((w) => w.active !== false);
+    wtSel.innerHTML =
+      `<option value="">Alle</option>` +
+      types.map((w) => `<option value="${escapeAttr(w.id)}">${escapeAttr(w.label)}</option>`).join('');
+    wtSel.value = prev || '';
+    reportWorkTypeId = wtSel.value;
+  }
+}
+
+function syncReportFilterUi() {
+  const openBtn = document.getElementById('rpModeOpen');
+  const rangeBtn = document.getElementById('rpModeRange');
+  const rangeRow = document.getElementById('rpRangeRow');
+  const fromEl = document.getElementById('rpFrom');
+  const toEl = document.getElementById('rpTo');
+  if (openBtn) openBtn.classList.toggle('active', reportMode === 'open');
+  if (rangeBtn) rangeBtn.classList.toggle('active', reportMode === 'range');
+  if (rangeRow) rangeRow.style.display = reportMode === 'range' ? 'flex' : 'none';
+  if (fromEl) fromEl.value = reportFrom || '';
+  if (toEl) toEl.value = reportTo || '';
+  const custSel = document.getElementById('rpCustomer');
+  const wtSel = document.getElementById('rpWorkType');
+  if (custSel) custSel.value = reportCustomerId || '';
+  if (wtSel) wtSel.value = reportWorkTypeId || '';
+}
+
+function reportFilterSummaryText() {
+  const modeLabel = reportMode === 'open' ? 'Offene Stunden' : 'Zeitraum';
+  let rangePart = '';
+  if (reportMode === 'range' && reportFrom && reportTo) {
+    rangePart = ` · ${IsoWeek.formatDe(reportFrom)}–${IsoWeek.formatDe(reportTo)}`;
+  }
+  const cust = CUSTOMERS.find((c) => c.id === reportCustomerId);
+  const custLabel = cust ? cust.name : 'alle Kunden';
+  const wt = WORK_TYPES.find((w) => w.id === reportWorkTypeId);
+  const wtLabel = wt ? `Arbeitsart: ${wt.label}` : 'alle Arbeitsarten';
+  return `${modeLabel}${rangePart} · ${custLabel} · ${wtLabel}`;
+}
+
+function updateReportFilterSummary() {
+  const el = document.getElementById('rpFilterSummary');
+  if (el) el.textContent = reportFilterSummaryText();
+}
+
+function setReportMode(mode) {
+  reportMode = mode === 'range' ? 'range' : 'open';
+  if (reportMode === 'range') ensureReportRangeDefaults();
+  syncReportFilterUi();
+  loadReports();
+}
+
+function setReportPreset(kind) {
+  const today = IsoWeek.zonedYmd(new Date());
+  if (kind === 'thisWeek') {
+    const cur = IsoWeek.getISOWeekParts(new Date());
+    const b = IsoWeek.isoWeekBounds(cur.year, cur.week);
+    reportFrom = b.from;
+    reportTo = b.to;
+  } else if (kind === 'lastWeek') {
+    const cur = IsoWeek.getISOWeekParts(new Date());
+    const prev = IsoWeek.shiftIsoWeek(cur.year, cur.week, -1);
+    const b = IsoWeek.isoWeekBounds(prev.year, prev.week);
+    reportFrom = b.from;
+    reportTo = b.to;
+  } else if (kind === 'thisMonth') {
+    const year = Number(today.slice(0, 4));
+    const month = Number(today.slice(5, 7));
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    reportFrom = `${year}-${String(month).padStart(2, '0')}-01`;
+    reportTo = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  }
+  reportMode = 'range';
+  syncReportFilterUi();
+  loadReports();
+}
+
+function onReportFilterChange() {
+  const fromEl = document.getElementById('rpFrom');
+  const toEl = document.getElementById('rpTo');
+  const custSel = document.getElementById('rpCustomer');
+  const wtSel = document.getElementById('rpWorkType');
+  if (fromEl) reportFrom = fromEl.value || '';
+  if (toEl) reportTo = toEl.value || '';
+  if (custSel) reportCustomerId = custSel.value || '';
+  if (wtSel) reportWorkTypeId = wtSel.value || '';
+  loadReports();
+}
+
+function billableOpenEntries(entries) {
+  return (entries || []).filter(
+    (en) => !en.invoiceId && !en.invoiceNumber && en.billable !== false && Number(en.hours) > 0
+  );
+}
+
+async function ensureReportFilterData() {
+  const needsCust = !CUSTOMERS.length;
+  const needsWt = !WORK_TYPES.length;
+  if (!needsCust && !needsWt) return;
+  const jobs = [];
+  if (needsCust) jobs.push(api('/customers').then((r) => { CUSTOMERS = r.customers || []; }));
+  if (needsWt) jobs.push(api('/work-types').then((r) => { WORK_TYPES = r.workTypes || []; }));
+  await Promise.all(jobs);
+}
+
 async function loadReports() {
   if (!IS_ADMIN) return;
-  if (reportYear == null || reportWeek == null) {
-    const cur = IsoWeek.getISOWeekParts(new Date());
-    reportYear = cur.year;
-    reportWeek = cur.week;
-  }
   const body = document.getElementById('rpBody');
-  const label = document.getElementById('rpWeekLabel');
-  const bounds = IsoWeek.isoWeekBounds(reportYear, reportWeek);
-  if (label) {
-    label.textContent = `KW ${reportWeek} · ${bounds.fromLabel}–${bounds.toLabel}`;
-  }
   if (body) {
     body.innerHTML = `<div class="card rp-empty">Lade Rapporte…</div>`;
   }
   try {
-    const data = await api(`/reports?year=${reportYear}&week=${reportWeek}`);
-    reportYear = data.year;
-    reportWeek = data.week;
-    const b = IsoWeek.isoWeekBounds(reportYear, reportWeek);
-    if (label) {
-      label.textContent = `KW ${reportWeek} · ${b.fromLabel}–${b.toLabel}`;
+    await ensureReportFilterData();
+    fillReportFilterSelects();
+    if (reportMode === 'range') ensureReportRangeDefaults();
+    syncReportFilterUi();
+    updateReportFilterSummary();
+    const params = new URLSearchParams({ mode: reportMode });
+    if (reportMode === 'range') {
+      if (!reportFrom || !reportTo) {
+        throw new Error('Bitte Von- und Bis-Datum wählen');
+      }
+      params.set('from', reportFrom);
+      params.set('to', reportTo);
     }
+    if (reportCustomerId) params.set('customerId', reportCustomerId);
+    if (reportWorkTypeId) params.set('workTypeId', reportWorkTypeId);
+    const data = await api(`/reports?${params.toString()}`);
+    lastReportsData = data;
+    updateReportFilterSummary();
     renderReports(data);
   } catch (e) {
+    lastReportsData = null;
     if (body) {
       body.innerHTML = `<div class="card rp-empty" style="color:var(--red);">${escapeAttr(e.message)}</div>`;
     }
   }
 }
 
-function authTokenQuery() {
-  const t = localStorage.getItem(TOKEN_KEY) || '';
-  return `token=${encodeURIComponent(t)}`;
+function formatHoursDeCsv(n) {
+  return (Math.round(Number(n) * 10) / 10).toFixed(1).replace('.', ',');
 }
 
-function invoiceFileHref(invoiceId, kind) {
-  return `/api/invoices/${encodeURIComponent(invoiceId)}/${kind}?${authTokenQuery()}`;
+async function loadHoursExport() {
+  if (!IS_ADMIN) return;
+  const sel = document.getElementById('exMonSel');
+  const body = document.getElementById('exBody');
+  const title = document.getElementById('exTitle');
+  const badge = document.getElementById('exTotalBadge');
+  if (!sel || !body) return;
+  if (!sel.options.length) fillMonthSelects();
+  const month = sel.value || currentMonthKey();
+  if (title) title.textContent = `Stundenexport · ${monthGermanLabel(month)}`;
+  body.innerHTML = `<div class="rp-empty" style="box-shadow:none;border:none;">Lade…</div>`;
+  try {
+    const data = await api(`/exports/hours?month=${encodeURIComponent(month)}&format=json`);
+    const rows = data.rows || [];
+    const totals = data.totals || { hoursTotal: 0, hoursBillable: 0, hoursNonBillable: 0 };
+    if (badge) badge.textContent = `${formatHoursDeCsv(totals.hoursTotal)} h`;
+    if (!rows.length) {
+      body.innerHTML = `<div class="rp-empty" style="box-shadow:none;border:none;">Keine zeitverfolgten Mitarbeiter.</div>`;
+      return;
+    }
+    const tableRows = rows
+      .map(
+        (r) => `<tr>
+        <td>${escapeAttr(r.employeeName)}</td>
+        <td class="mono" style="color:var(--t3);">${escapeAttr(r.personnelNumber || '—')}</td>
+        <td class="mono">${escapeAttr(r.month)}</td>
+        <td class="mono">${escapeAttr(formatHoursDeCsv(r.hoursTotal))}</td>
+        <td class="mono">${escapeAttr(formatHoursDeCsv(r.hoursBillable))}</td>
+        <td class="mono">${escapeAttr(formatHoursDeCsv(r.hoursNonBillable))}</td>
+      </tr>`
+      )
+      .join('');
+    body.innerHTML = `<table>
+      <thead><tr>
+        <th>Mitarbeiter</th><th>Personalnummer</th><th>Monat</th>
+        <th>Stunden total</th><th>davon verrechenbar</th><th>davon nicht verrechenbar</th>
+      </tr></thead>
+      <tbody>${tableRows}
+        <tr style="font-weight:800;background:rgba(240,242,247,.85);">
+          <td colspan="3">Total</td>
+          <td class="mono">${escapeAttr(formatHoursDeCsv(totals.hoursTotal))}</td>
+          <td class="mono">${escapeAttr(formatHoursDeCsv(totals.hoursBillable))}</td>
+          <td class="mono">${escapeAttr(formatHoursDeCsv(totals.hoursNonBillable))}</td>
+        </tr>
+      </tbody>
+    </table>`;
+  } catch (e) {
+    body.innerHTML = `<div class="rp-empty" style="color:var(--red);box-shadow:none;border:none;">${escapeAttr(e.message)}</div>`;
+  }
+}
+
+async function downloadHoursExportCsv() {
+  if (!IS_ADMIN) return;
+  const sel = document.getElementById('exMonSel');
+  const month = (sel && sel.value) || currentMonthKey();
+  const t = localStorage.getItem(TOKEN_KEY);
+  try {
+    const r = await fetch(`/api/exports/hours?month=${encodeURIComponent(month)}&format=csv`, {
+      headers: t ? { Authorization: `Bearer ${t}` } : {},
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j.error || 'Export fehlgeschlagen');
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `saniga-stunden-${month}.csv`;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    toast(e.message || 'Export fehlgeschlagen');
+  }
+}
+
+async function renderAbsenzen() {
+  if (!IS_ADMIN) return;
+  const sel = document.getElementById('absMonSel');
+  const body = document.getElementById('absBody');
+  const title = document.getElementById('absTitle');
+  const badge = document.getElementById('absTotalBadge');
+  if (!sel || !body) return;
+  if (!sel.options.length) fillMonthSelects();
+  const month = sel.value || currentMonthKey();
+  if (title) title.textContent = `Absenzen · ${monthGermanLabel(month)}`;
+  try {
+    await ensureEntryMasterData();
+  } catch (e) {
+    body.innerHTML = `<div class="rp-empty" style="color:var(--red);box-shadow:none;border:none;">${escapeAttr(e.message)}</div>`;
+    return;
+  }
+  const absenceTypes = WORK_TYPES.filter((w) => w.active !== false && w.billable === false).sort((a, b) =>
+    a.label.localeCompare(b.label, 'de')
+  );
+  const team = trackedEmps();
+  if (!absenceTypes.length) {
+    body.innerHTML = `<div class="rp-empty" style="box-shadow:none;border:none;">Keine Absenz-Arbeitsarten vorhanden.</div>`;
+    if (badge) badge.textContent = '0,0 h';
+    return;
+  }
+  let grand = 0;
+  const rows = team
+    .map((emp) => {
+      const cells = absenceTypes.map((wt) => {
+        const hrs = ENTRIES.filter(
+          (en) =>
+            en.empId === emp.id &&
+            en.workTypeId === wt.id &&
+            en.date.startsWith(month) &&
+            en.billable === false
+        ).reduce((s, en) => s + entryHoursValue(en), 0);
+        grand += hrs;
+        return hrs;
+      });
+      const rowTotal = cells.reduce((s, h) => s + h, 0);
+      return { emp, cells, rowTotal };
+    })
+  const head = `<tr><th>Mitarbeiter</th>${absenceTypes
+    .map((w) => `<th>${escapeAttr(w.label)}</th>`)
+    .join('')}<th>Total</th></tr>`;
+  const bodyRows = rows
+    .map((r) => {
+      const cellHtml = r.cells
+        .map((h) => `<td class="mono">${h > 0 ? escapeAttr(formatHoursDeCsv(h)) : '—'}</td>`)
+        .join('');
+      return `<tr>
+        <td>${escapeAttr(r.emp.first)} ${escapeAttr(r.emp.last)}</td>
+        ${cellHtml}
+        <td class="mono" style="font-weight:700;">${escapeAttr(formatHoursDeCsv(r.rowTotal))}</td>
+      </tr>`;
+    })
+    .join('');
+  const colTotals = absenceTypes.map((_, i) => rows.reduce((s, r) => s + r.cells[i], 0));
+  const foot = `<tr style="font-weight:800;background:rgba(240,242,247,.85);">
+      <td>Total</td>
+      ${colTotals.map((h) => `<td class="mono">${escapeAttr(formatHoursDeCsv(h))}</td>`).join('')}
+      <td class="mono">${escapeAttr(formatHoursDeCsv(grand))}</td>
+    </tr>`;
+  if (badge) badge.textContent = `${formatHoursDeCsv(grand)} h`;
+  body.innerHTML = `<table><thead>${head}</thead><tbody>${bodyRows}${foot}</tbody></table>`;
+}
+
+async function openInvoiceDownload(invoiceId, format) {
+  if (!IS_ADMIN || !invoiceId) return;
+  try {
+    const res = await api(`/invoices/${encodeURIComponent(invoiceId)}/download-link`, {
+      method: 'POST',
+      body: JSON.stringify({ format }),
+    });
+    if (!res?.url) throw new Error('Download-Link fehlt');
+    window.open(res.url, '_blank', 'noopener');
+  } catch (e) {
+    toast(e.message || 'Download fehlgeschlagen');
+  }
 }
 
 function invoiceDownloadLinksHtml(invoiceId) {
-  return `<a class="btn btn-g" href="${escapeAttr(invoiceFileHref(invoiceId, 'pdf'))}" target="_blank" rel="noopener">PDF</a>
-    <a class="btn btn-g" href="${escapeAttr(invoiceFileHref(invoiceId, 'docx'))}" target="_blank" rel="noopener">Word</a>`;
+  const id = escapeAttr(invoiceId);
+  return `<button type="button" class="btn btn-g" onclick="openInvoiceDownload('${id}','pdf')">PDF</button>
+    <button type="button" class="btn btn-g" onclick="openInvoiceDownload('${id}','docx')">Word</button>`;
 }
 
 function invoiceResultRowHtml(invoice, { created = false } = {}) {
@@ -501,12 +875,25 @@ function formatInvoicePeriod(from, to) {
   return `${fmt(from)} – ${fmt(to)}`;
 }
 
+function findReportSite(siteId) {
+  const customers = lastReportsData?.customers || [];
+  for (const c of customers) {
+    const site = (c.sites || []).find((s) => s.id === siteId);
+    if (site) return { customer: c, site };
+  }
+  return null;
+}
+
 function renderReports(data) {
   const body = document.getElementById('rpBody');
   if (!body) return;
   const customers = data.customers || [];
   if (!customers.length) {
-    body.innerHTML = `<div class="card rp-empty">Keine Einträge mit Objekt in dieser Woche.</div>`;
+    const emptyMsg =
+      reportMode === 'open'
+        ? 'Keine offenen Stunden mit Objekt.'
+        : 'Keine Einträge mit Objekt in diesem Zeitraum.';
+    body.innerHTML = `<div class="card rp-empty">${emptyMsg}</div>`;
     return;
   }
   const flash = reportInvoiceFlash;
@@ -516,26 +903,36 @@ function renderReports(data) {
       const sitesHtml = (c.sites || [])
         .map((s) => {
           const entries = s.entries || [];
-          const allInvoiced = entries.length > 0 && entries.every((en) => en.invoiceId || en.invoiceNumber);
+          const openBillable = billableOpenEntries(entries);
           const siteInvoices = siteInvoicesFromEntries(entries);
           const rows = entries
             .map((en) => {
               const invoiced = !!(en.invoiceId || en.invoiceNumber);
+              const nonBillable = en.billable === false;
+              const rowClass = [
+                invoiced ? 'rp-entry-invoiced' : '',
+                nonBillable ? 'rp-entry-nonbillable' : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
               const invBadge = en.invoiceNumber
                 ? `<span class="rp-inv-badge">${escapeAttr(en.invoiceNumber)}</span>`
                 : '';
-              return `<tr class="${invoiced ? 'rp-entry-invoiced' : ''}">
+              const nbBadge = nonBillable
+                ? `<span class="rp-nb-badge">nicht verrechenbar</span>`
+                : '';
+              return `<tr class="${rowClass}">
               <td>${escapeAttr(fmtD(en.date))}${invBadge}</td>
               <td>${escapeAttr(en.employeeName)}</td>
-              <td>${escapeAttr(en.workType)}</td>
+              <td>${escapeAttr(en.workType)}${nbBadge}</td>
               <td class="mono">${escapeAttr(formatReportHours(en.hours))}</td>
               <td style="color:var(--t2);">${escapeAttr(en.note || '—')}</td>
             </tr>`;
             })
             .join('');
-          const createBtn = allInvoiced
-            ? ''
-            : `<button type="button" class="btn btn-g" data-rp-create-inv onclick="createReportInvoice('${escapeAttr(s.id)}')">Rechnung erstellen</button>`;
+          const createBtn = openBillable.length
+            ? `<button type="button" class="btn btn-g" data-rp-create-inv onclick="createReportInvoice('${escapeAttr(s.id)}')">Rechnung erstellen</button>`
+            : '';
           const resultRows = siteInvoices
             .map((inv) =>
               invoiceResultRowHtml(inv, {
@@ -584,13 +981,102 @@ function setReportInvoiceMessage(siteId, msg, isErr) {
   el.classList.toggle('err', !!isErr);
 }
 
+function buildReportInvoicePayload(siteId, entries) {
+  const dates = (entries || []).map((e) => e.date).filter(Boolean).sort();
+  if (!dates.length) return null;
+  const from = reportMode === 'range' && reportFrom ? reportFrom : dates[0];
+  const to = reportMode === 'range' && reportTo ? reportTo : dates[dates.length - 1];
+  if (!from || !to) return null;
+  const payload = { siteId, from, to };
+  if (reportWorkTypeId) payload.workTypeId = reportWorkTypeId;
+  return payload;
+}
+
 async function createReportInvoice(siteId) {
   if (!IS_ADMIN) return;
-  if (reportYear == null || reportWeek == null) return;
+  const found = findReportSite(siteId);
+  if (!found) {
+    setReportInvoiceMessage(siteId, 'Objekt nicht gefunden', true);
+    return;
+  }
+  const openBillable = billableOpenEntries(found.site.entries);
+  if (!openBillable.length) {
+    setReportInvoiceMessage(siteId, 'Keine offenen verrechenbaren Stunden für dieses Objekt.', true);
+    return;
+  }
+  const payload = buildReportInvoicePayload(siteId, openBillable);
+  if (!payload) {
+    setReportInvoiceMessage(siteId, 'Datum für die Verrechnung fehlt.', true);
+    return;
+  }
+  pendingReportInvoice = { ...payload };
   setReportInvoiceMessage(siteId, '', false);
-  const block = reportSiteBlock(siteId);
-  const btn = block?.querySelector('[data-rp-create-inv]');
+  const modal = document.getElementById('moRpInvoice');
+  const body = document.getElementById('rpInvConfirmBody');
+  const err = document.getElementById('rpInvConfirmErr');
+  if (!modal || !body) {
+    setReportInvoiceMessage(siteId, 'Bestätigungsdialog fehlt – bitte Seite neu laden.', true);
+    return;
+  }
+  if (err) {
+    err.style.display = 'none';
+    err.textContent = '';
+  }
+  body.innerHTML = `<div style="color:var(--t2);">Ansätze werden geladen…</div>`;
+  modal.classList.add('open');
+
+  try {
+    const preview = await api('/invoices/preview', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    const lineRows = (preview.lineItems || [])
+      .flatMap((g) =>
+        (g.employees || []).map(
+          (emp) =>
+            `<li><strong>${escapeAttr(g.workTypeLabel)}</strong> · ${escapeAttr(emp.employeeName)}: ${escapeAttr(formatReportHours(emp.hours))} h × CHF ${escapeAttr(formatSwissChf(emp.chfPerHour))} = CHF ${escapeAttr(formatSwissChf(emp.amount))}</li>`
+        )
+      )
+      .join('');
+    const totalHours = Math.round(
+      (preview.lineItems || []).reduce((s, g) => s + Number(g.hours || 0), 0) * 100
+    ) / 100;
+    body.innerHTML = `
+      <div><strong>${escapeAttr(preview.customer?.name || found.customer.name)}</strong> · ${escapeAttr(preview.site?.label || found.site.label)}</div>
+      <div style="margin-top:10px;color:var(--t2);font-size:12px;">${escapeAttr(reportFilterSummaryText())}</div>
+      <ul style="margin:12px 0 0;padding-left:18px;">
+        ${lineRows || '<li>Keine Positionen</li>'}
+        <li style="margin-top:6px;"><strong>Total:</strong> ${escapeAttr(formatReportHours(totalHours))} h</li>
+        <li><strong>Zeitraum:</strong> ${escapeAttr(IsoWeek.formatDe(preview.periodFrom || payload.from))} – ${escapeAttr(IsoWeek.formatDe(preview.periodTo || payload.to))}</li>
+        <li><strong>Netto:</strong> CHF ${escapeAttr(formatSwissChf(preview.subtotal))}</li>
+      </ul>`;
+  } catch (e) {
+    modal.classList.remove('open');
+    pendingReportInvoice = null;
+    setReportInvoiceMessage(siteId, e.message || 'Vorschau fehlgeschlagen', true);
+  }
+}
+
+async function confirmCreateReportInvoice() {
+  if (!IS_ADMIN || !pendingReportInvoice) return;
+  const { siteId, from, to, workTypeId } = pendingReportInvoice;
+  if (!from || !to) {
+    const errEl = document.getElementById('rpInvConfirmErr');
+    if (errEl) {
+      errEl.textContent = 'from und to sind erforderlich.';
+      errEl.style.display = 'block';
+    }
+    return;
+  }
+  const btn = document.getElementById('rpInvConfirmBtn');
+  const err = document.getElementById('rpInvConfirmErr');
   if (btn) btn.disabled = true;
+  if (err) {
+    err.style.display = 'none';
+    err.textContent = '';
+  }
+  const payload = { siteId, from, to };
+  if (workTypeId) payload.workTypeId = workTypeId;
   try {
     const t = localStorage.getItem(TOKEN_KEY);
     const r = await fetch('/api/invoices', {
@@ -599,7 +1085,7 @@ async function createReportInvoice(siteId) {
         'Content-Type': 'application/json',
         ...(t ? { Authorization: `Bearer ${t}` } : {}),
       },
-      body: JSON.stringify({ siteId, year: reportYear, week: reportWeek }),
+      body: JSON.stringify(payload),
     });
     const text = await r.text();
     let data = {};
@@ -609,26 +1095,26 @@ async function createReportInvoice(siteId) {
       data = { error: text || 'Ungültige Antwort' };
     }
     if (r.status === 409) {
-      setReportInvoiceMessage(siteId, 'Für diese Woche sind keine offenen Stunden vorhanden.', true);
-      return;
+      throw new Error('Keine offenen verrechenbaren Stunden für diese Auswahl.');
     }
     if (!r.ok) {
       throw new Error(data.error || `HTTP ${r.status}`);
     }
     const invoice = data.invoice;
+    pendingReportInvoice = null;
+    closeM('moRpInvoice');
     if (invoice?.id && invoice?.number) {
       reportInvoiceFlash = { siteId, invoiceId: invoice.id, number: invoice.number };
-      const results = block?.querySelector('[data-rp-inv-results]');
-      if (results) {
-        results.insertAdjacentHTML('afterbegin', invoiceResultRowHtml(invoice, { created: true }));
-      }
-      if (btn) btn.remove();
     }
     await loadReports();
   } catch (e) {
+    if (err) {
+      err.textContent = e.message || 'Rechnung fehlgeschlagen';
+      err.style.display = 'block';
+    }
     setReportInvoiceMessage(siteId, e.message || 'Rechnung fehlgeschlagen', true);
   } finally {
-    if (btn && btn.isConnected) btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -657,18 +1143,101 @@ function renderInvoices(invoices) {
       const customer = inv.customer?.name || '—';
       const site = inv.site?.label || '—';
       const period = formatInvoicePeriod(inv.periodFrom, inv.periodTo);
-      return `<div class="inv-row">
-        <div class="inv-row-main">
-          <div class="inv-row-num">${escapeAttr(inv.number)}</div>
-          <div class="inv-row-meta">${escapeAttr(customer)} · ${escapeAttr(site)} · ${escapeAttr(period)}</div>
+      const cancelled = !!inv.cancelledAt;
+      const id = escapeAttr(inv.id);
+      const cancelBtn = cancelled
+        ? ''
+        : `<button type="button" class="btn btn-g" data-inv-cancel-toggle onclick="toggleInvoiceCancelPanel('${id}')">Stornieren</button>`;
+      const statusBadge = cancelled
+        ? `<span class="inv-badge-cancelled">Storniert</span>`
+        : '';
+      const reasonLine = cancelled
+        ? `<div class="inv-cancel-reason">Grund: ${escapeAttr(inv.cancelledReason || '—')}</div>`
+        : '';
+      return `<div class="inv-row ${cancelled ? 'cancelled' : ''}" data-invoice-id="${id}">
+        <div class="inv-row-top">
+          <div class="inv-row-main">
+            <div class="inv-row-num">${escapeAttr(inv.number)}${statusBadge}</div>
+            <div class="inv-row-meta">${escapeAttr(customer)} · ${escapeAttr(site)} · ${escapeAttr(period)}</div>
+            ${reasonLine}
+          </div>
+          <div class="inv-row-total">CHF ${escapeAttr(formatSwissChf(inv.total))}</div>
+          <div class="inv-row-actions">
+            ${invoiceDownloadLinksHtml(inv.id)}
+            ${cancelBtn}
+          </div>
         </div>
-        <div class="inv-row-total">CHF ${escapeAttr(formatSwissChf(inv.total))}</div>
-        <div class="inv-row-actions">
-          ${invoiceDownloadLinksHtml(inv.id)}
+        <div class="inv-cancel-panel" data-inv-cancel-panel>
+          <div class="fg">
+            <label>Begründung der Stornierung</label>
+            <input type="text" data-inv-cancel-reason maxlength="500" placeholder="z.B. Fehlerhaft erstellt">
+          </div>
+          <p class="inv-cancel-err" data-inv-cancel-err></p>
+          <div class="inv-cancel-actions">
+            <button type="button" class="btn btn-g" onclick="toggleInvoiceCancelPanel('${id}')">Abbrechen</button>
+            <button type="button" class="btn btn-p" data-inv-cancel-confirm onclick="confirmCancelInvoice('${id}')">Stornierung bestätigen</button>
+          </div>
         </div>
       </div>`;
     })
     .join('')}</div></div>`;
+}
+
+function invoiceRowEl(invoiceId) {
+  return document.querySelector(`.inv-row[data-invoice-id="${invoiceId}"]`);
+}
+
+function toggleInvoiceCancelPanel(invoiceId) {
+  const row = invoiceRowEl(invoiceId);
+  if (!row) return;
+  const panel = row.querySelector('[data-inv-cancel-panel]');
+  if (!panel) return;
+  const open = !panel.classList.contains('open');
+  document.querySelectorAll('[data-inv-cancel-panel].open').forEach((p) => {
+    if (p !== panel) p.classList.remove('open');
+  });
+  panel.classList.toggle('open', open);
+  if (open) {
+    const input = panel.querySelector('[data-inv-cancel-reason]');
+    if (input) input.focus();
+  }
+}
+
+async function confirmCancelInvoice(invoiceId) {
+  const row = invoiceRowEl(invoiceId);
+  if (!row) return;
+  const panel = row.querySelector('[data-inv-cancel-panel]');
+  const input = panel?.querySelector('[data-inv-cancel-reason]');
+  const err = panel?.querySelector('[data-inv-cancel-err]');
+  const btn = panel?.querySelector('[data-inv-cancel-confirm]');
+  const reason = (input?.value || '').trim();
+  if (err) {
+    err.style.display = 'none';
+    err.textContent = '';
+  }
+  if (!reason) {
+    if (err) {
+      err.textContent = 'Bitte eine Begründung angeben.';
+      err.style.display = 'block';
+    }
+    return;
+  }
+  if (btn) btn.disabled = true;
+  try {
+    await api(`/invoices/${encodeURIComponent(invoiceId)}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    toast('Rechnung storniert');
+    await loadInvoices();
+  } catch (e) {
+    if (err) {
+      err.textContent = e.message || 'Stornierung fehlgeschlagen';
+      err.style.display = 'block';
+    }
+  } finally {
+    if (btn && btn.isConnected) btn.disabled = false;
+  }
 }
 
 function showSdErr(id, msg) {
@@ -697,23 +1266,125 @@ function showStammdatenTab(tab) {
     renderSites();
   }
   if (tab === 'arbeitsarten') renderWorkTypes();
+  if (tab === 'ansaetze') {
+    fillRateSelects();
+    renderRates();
+  }
+  if (tab === 'firma') renderCompany();
 }
 
 async function loadStammdaten() {
   if (!IS_ADMIN) return;
   try {
-    const [cRes, sRes, wRes] = await Promise.all([
+    const [cRes, sRes, wRes, coRes, rRes] = await Promise.all([
       api('/customers'),
       api('/sites'),
       api('/work-types'),
+      api('/company'),
+      api('/rates'),
     ]);
     CUSTOMERS = cRes.customers || [];
     SITES = sRes.sites || [];
     WORK_TYPES = wRes.workTypes || [];
+    COMPANY = coRes.company || null;
+    RATES = rRes.rates || [];
     showStammdatenTab(sdTab || 'kunden');
   } catch (e) {
     showSdErr('sdCustErr', e.message);
     toast(e.message);
+  }
+}
+
+function fillRateSelects() {
+  const cust = document.getElementById('sdRateCust');
+  const wt = document.getElementById('sdRateWt');
+  const emp = document.getElementById('sdRateEmp');
+  if (cust) {
+    cust.innerHTML =
+      '<option value="">Alle</option>' +
+      CUSTOMERS.map((c) => `<option value="${escapeAttr(c.id)}">${escapeAttr(c.name)}</option>`).join('');
+  }
+  if (wt) {
+    wt.innerHTML =
+      '<option value="">Alle</option>' +
+      WORK_TYPES.filter((w) => w.active !== false)
+        .map((w) => `<option value="${escapeAttr(w.id)}">${escapeAttr(w.label)}</option>`)
+        .join('');
+  }
+  if (emp) {
+    emp.innerHTML =
+      '<option value="">Alle</option>' +
+      EMPS.map(
+        (e) =>
+          `<option value="${escapeAttr(e.id)}">${escapeAttr(`${e.first} ${e.last}`.trim())}</option>`
+      ).join('');
+  }
+  const from = document.getElementById('sdRateFrom');
+  if (from && !from.value) {
+    from.value = IsoWeek.zonedYmd();
+  }
+}
+
+function formatRateYmdDe(ymd) {
+  if (!ymd) return '—';
+  return IsoWeek.formatDe(ymd);
+}
+
+function renderRates() {
+  const body = document.getElementById('sdRateBody');
+  const count = document.getElementById('sdRateCount');
+  if (!body) return;
+  if (count) count.textContent = String(RATES.length);
+  if (!RATES.length) {
+    body.innerHTML = '<tr><td colspan="6" style="color:var(--t3);">Noch keine Ansätze.</td></tr>';
+    return;
+  }
+  body.innerHTML = RATES.map((r) => {
+    const cust = r.customer?.name || 'Alle';
+    const wt = r.workType?.label || 'Alle';
+    const emp = r.user?.name || 'Alle';
+    return `<tr>
+      <td>${escapeAttr(cust)}</td>
+      <td>${escapeAttr(wt)}</td>
+      <td>${escapeAttr(emp)}</td>
+      <td class="mono">${escapeAttr(formatSwissChf(r.chfPerHour))}</td>
+      <td>${escapeAttr(formatRateYmdDe(r.validFrom))}</td>
+      <td>${escapeAttr(formatRateYmdDe(r.validTo))}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function addRate() {
+  showSdErr('sdRateErr', '');
+  const customerId = document.getElementById('sdRateCust')?.value || '';
+  const workTypeId = document.getElementById('sdRateWt')?.value || '';
+  const userId = document.getElementById('sdRateEmp')?.value || '';
+  const chfPerHour = Number(document.getElementById('sdRateChf')?.value);
+  const validFrom = document.getElementById('sdRateFrom')?.value || '';
+  const validTo = document.getElementById('sdRateTo')?.value || '';
+  if (!validFrom || !(chfPerHour > 0)) {
+    showSdErr('sdRateErr', 'Bitte CHF/Stunde und gültig ab angeben.');
+    return;
+  }
+  try {
+    await api('/rates', {
+      method: 'POST',
+      body: JSON.stringify({
+        customerId: customerId || null,
+        workTypeId: workTypeId || null,
+        userId: userId || null,
+        chfPerHour,
+        validFrom,
+        validTo: validTo || null,
+      }),
+    });
+    document.getElementById('sdRateChf').value = '';
+    document.getElementById('sdRateTo').value = '';
+    toast('Ansatz gespeichert');
+    await loadStammdaten();
+    showStammdatenTab('ansaetze');
+  } catch (e) {
+    showSdErr('sdRateErr', e.message);
   }
 }
 
@@ -737,34 +1408,53 @@ function renderCustomers() {
   if (!body) return;
   if (count) count.textContent = String(CUSTOMERS.length);
   if (!CUSTOMERS.length) {
-    body.innerHTML = '<tr><td colspan="3" style="color:var(--t3);">Noch keine Kunden.</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="color:var(--t3);">Noch keine Kunden.</td></tr>';
     return;
   }
   body.innerHTML = CUSTOMERS.map((c) => {
     const id = escapeAttr(c.id);
+    const days = c.paymentTermDays == null ? 14 : Number(c.paymentTermDays);
     return `<tr data-id="${id}">
       <td><input class="sd-inline-input" type="text" id="sdCustName_${id}" value="${escapeAttr(c.name || '')}" maxlength="200"></td>
-      <td><input class="sd-inline-input" type="text" id="sdCustAddr_${id}" value="${escapeAttr(c.address || '')}" maxlength="500" placeholder="—"></td>
+      <td><input class="sd-inline-input" type="text" id="sdCustStreet_${id}" value="${escapeAttr(c.street || '')}" maxlength="500" placeholder="—"></td>
+      <td><input class="sd-inline-input" type="text" id="sdCustZip_${id}" value="${escapeAttr(c.postalCode || '')}" maxlength="20" placeholder="—"></td>
+      <td><input class="sd-inline-input" type="text" id="sdCustCity_${id}" value="${escapeAttr(c.city || '')}" maxlength="120" placeholder="—"></td>
+      <td><input class="sd-inline-input" type="text" id="sdCustContact_${id}" value="${escapeAttr(c.contactPerson || '')}" maxlength="200" placeholder="—"></td>
+      <td><input class="sd-inline-input" type="number" id="sdCustPay_${id}" value="${escapeAttr(days)}" min="0" max="365" step="1" style="width:72px;"></td>
       <td><div class="sd-actions"><button type="button" class="btn btn-g" onclick="saveCustomer('${id}')">Speichern</button></div></td>
     </tr>`;
   }).join('');
 }
 
+function readCustomerForm() {
+  return {
+    name: document.getElementById('sdCustName').value.trim(),
+    street: document.getElementById('sdCustStreet').value.trim() || null,
+    postalCode: document.getElementById('sdCustZip').value.trim() || null,
+    city: document.getElementById('sdCustCity').value.trim() || null,
+    contactPerson: document.getElementById('sdCustContact').value.trim() || null,
+    paymentTermDays: Number(document.getElementById('sdCustPayDays').value) || 14,
+  };
+}
+
 async function addCustomer() {
   showSdErr('sdCustErr', '');
-  const name = document.getElementById('sdCustName').value.trim();
-  const address = document.getElementById('sdCustAddr').value.trim();
-  if (!name) {
+  const body = readCustomerForm();
+  if (!body.name) {
     showSdErr('sdCustErr', 'Bitte einen Namen eingeben.');
     return;
   }
   try {
     await api('/customers', {
       method: 'POST',
-      body: JSON.stringify({ name, address: address || null }),
+      body: JSON.stringify(body),
     });
     document.getElementById('sdCustName').value = '';
-    document.getElementById('sdCustAddr').value = '';
+    document.getElementById('sdCustStreet').value = '';
+    document.getElementById('sdCustZip').value = '';
+    document.getElementById('sdCustCity').value = '';
+    document.getElementById('sdCustContact').value = '';
+    document.getElementById('sdCustPayDays').value = '14';
     toast('Kunde hinzugefügt');
     await loadStammdaten();
   } catch (e) {
@@ -774,23 +1464,72 @@ async function addCustomer() {
 
 async function saveCustomer(id) {
   showSdErr('sdCustErr', '');
-  const nameEl = document.getElementById(`sdCustName_${id}`);
-  const addrEl = document.getElementById(`sdCustAddr_${id}`);
-  const name = nameEl ? nameEl.value.trim() : '';
-  const address = addrEl ? addrEl.value.trim() : '';
+  const name = (document.getElementById(`sdCustName_${id}`)?.value || '').trim();
   if (!name) {
     showSdErr('sdCustErr', 'Name darf nicht leer sein.');
     return;
   }
+  const paymentTermDays = Number(document.getElementById(`sdCustPay_${id}`)?.value);
   try {
     await api(`/customers/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ name, address: address || null }),
+      body: JSON.stringify({
+        name,
+        street: (document.getElementById(`sdCustStreet_${id}`)?.value || '').trim() || null,
+        postalCode: (document.getElementById(`sdCustZip_${id}`)?.value || '').trim() || null,
+        city: (document.getElementById(`sdCustCity_${id}`)?.value || '').trim() || null,
+        contactPerson: (document.getElementById(`sdCustContact_${id}`)?.value || '').trim() || null,
+        paymentTermDays: Number.isFinite(paymentTermDays) ? paymentTermDays : 14,
+      }),
     });
     toast('Kunde gespeichert');
     await loadStammdaten();
   } catch (e) {
     showSdErr('sdCustErr', e.message);
+  }
+}
+
+function renderCompany() {
+  showSdErr('sdCoErr', '');
+  if (!COMPANY) return;
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.value = v == null ? '' : String(v);
+  };
+  set('sdCoName', COMPANY.name || '');
+  set('sdCoStreet', COMPANY.street || '');
+  set('sdCoZip', COMPANY.postalCode || '');
+  set('sdCoCity', COMPANY.city || '');
+  set('sdCoUid', COMPANY.uid || '');
+  set('sdCoVat', COMPANY.vatRate ?? 8.1);
+  set('sdCoInvStart', COMPANY.invoiceStartNumber ?? 1);
+}
+
+async function saveCompany() {
+  showSdErr('sdCoErr', '');
+  const name = (document.getElementById('sdCoName')?.value || '').trim();
+  if (!name) {
+    showSdErr('sdCoErr', 'Firmenname ist erforderlich.');
+    return;
+  }
+  try {
+    const res = await api('/company', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name,
+        street: (document.getElementById('sdCoStreet')?.value || '').trim() || null,
+        postalCode: (document.getElementById('sdCoZip')?.value || '').trim() || null,
+        city: (document.getElementById('sdCoCity')?.value || '').trim() || null,
+        uid: (document.getElementById('sdCoUid')?.value || '').trim() || null,
+        vatRate: Number(document.getElementById('sdCoVat')?.value),
+        invoiceStartNumber: Number(document.getElementById('sdCoInvStart')?.value),
+      }),
+    });
+    COMPANY = res.company;
+    renderCompany();
+    toast('Firma gespeichert');
+  } catch (e) {
+    showSdErr('sdCoErr', e.message);
   }
 }
 
@@ -800,7 +1539,7 @@ function renderSites() {
   if (!body) return;
   if (count) count.textContent = String(SITES.length);
   if (!SITES.length) {
-    body.innerHTML = '<tr><td colspan="5" style="color:var(--t3);">Noch keine Objekte.</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" style="color:var(--t3);">Noch keine Objekte.</td></tr>';
     return;
   }
   body.innerHTML = SITES.map((s) => {
@@ -809,6 +1548,7 @@ function renderSites() {
     const active = s.active !== false;
     return `<tr class="${active ? '' : 'sd-row-inactive'}" data-id="${id}">
       <td>${escapeAttr(s.label || '')}</td>
+      <td>${escapeAttr(s.objectNumber || '—')}</td>
       <td>${escapeAttr(custName)}</td>
       <td>${escapeAttr(s.address || '—')}</td>
       <td><span class="badge ${active ? 'bg' : 'br'}">${active ? 'aktiv' : 'inaktiv'}</span></td>
@@ -823,6 +1563,7 @@ async function addSite() {
   showSdErr('sdSiteErr', '');
   const customerId = document.getElementById('sdSiteCust').value;
   const label = document.getElementById('sdSiteLabel').value.trim();
+  const objectNumber = document.getElementById('sdSiteObjNr').value.trim();
   const address = document.getElementById('sdSiteAddr').value.trim();
   if (!customerId) {
     showSdErr('sdSiteErr', 'Bitte einen Kunden wählen.');
@@ -835,9 +1576,15 @@ async function addSite() {
   try {
     await api('/sites', {
       method: 'POST',
-      body: JSON.stringify({ customerId, label, address: address || null }),
+      body: JSON.stringify({
+        customerId,
+        label,
+        objectNumber: objectNumber || null,
+        address: address || null,
+      }),
     });
     document.getElementById('sdSiteLabel').value = '';
+    document.getElementById('sdSiteObjNr').value = '';
     document.getElementById('sdSiteAddr').value = '';
     toast('Objekt hinzugefügt');
     await loadStammdaten();
@@ -932,9 +1679,13 @@ function renderMeine() {
   document.getElementById('mSub').textContent = `von ${soll}h Soll`;
   document.getElementById('mProg').style.width = `${pct}%`;
   document.getElementById('mPct').textContent = `${pct}% erfüllt`;
-  document.getElementById('mLohnLabel').textContent = `Erwarteter Lohn ${MOS[+m.split('-')[1]]}`;
-  document.getElementById('mLohn').textContent = `CHF ${Math.round(hrs * (e?.rate || 35)).toLocaleString('de-CH')}.–`;
-  document.getElementById('mRate').textContent = `bei CHF ${e?.rate || 35}.–/h`;
+  // Erwarteter Lohn / Stundenlohn line hidden — payroll is external (Treuhänder).
+  // const mLohnLabel = document.getElementById('mLohnLabel');
+  // if (mLohnLabel) {
+  //   mLohnLabel.textContent = `Erwarteter Lohn ${MOS[+m.split('-')[1]]}`;
+  //   document.getElementById('mLohn').textContent = `CHF ${Math.round(hrs * (e?.rate || 35)).toLocaleString('de-CH')}.–`;
+  //   document.getElementById('mRate').textContent = `bei CHF ${e?.rate || 35}.–/h`;
+  // }
 
   const wk = wkDates();
   const wEntries = ENTRIES.filter((en) => en.empId === curUser && wk.includes(en.date)).sort((a, b) => (a.date > b.date ? -1 : 1));
@@ -951,24 +1702,21 @@ function renderMeine() {
   }
   list.innerHTML = wEntries
     .map((en) => {
-      const siteLbl = entrySiteLabel(en);
       const workLbl = entryWorkLabel(en);
-      const meta = [siteLbl, workLbl].filter(Boolean).join(' · ') || en.note || '—';
+      const siteLbl = entrySiteLabel(en);
+      const meta = isAbsenceEntry(en)
+        ? workLbl || 'Absenz'
+        : [siteLbl, workLbl].filter(Boolean).join(' · ') || en.note || '—';
+      const absClass = isAbsenceEntry(en) ? ' entry-absence' : '';
+      const absBadge = isAbsenceEntry(en) ? '<span class="entry-abs-badge">Absenz</span>' : '';
       return `
-    <div class="ei">
+    <div class="ei${absClass}">
       <div class="ei-dot"></div>
-      <div class="ei-date">${fmtD(en.date)}</div>
+      <div class="ei-date">${fmtD(en.date)}${absBadge}</div>
       <div class="ei-time">${entryTimeLabel(en)}</div>
       <div class="ei-dur">${mDur(net(en))}</div>
       <div class="ei-note">${escapeAttr(meta)}</div>
-      <div class="ei-acts">
-        <div class="ib" onclick="openEdit('${en.id}')" title="Bearbeiten">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </div>
-        <div class="ib del" onclick="quickDel('${en.id}')" title="Löschen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-        </div>
-      </div>
+      <div class="ei-acts">${entryActionButtonsHtml(en)}</div>
     </div>`;
     })
     .join('');
@@ -996,39 +1744,115 @@ function renderMonat() {
   const [y, mo] = m.split('-');
   document.getElementById('monTitle').textContent = `${MOS[+mo]} ${y}`;
   const entries = eEmp(curUser, m).sort((a, b) => (a.date > b.date ? -1 : 1));
-  const tot = entries.reduce((s, e) => s + net(e), 0);
-  document.getElementById('monBadge').textContent = `${mDur(tot)} Total`;
+  const totHrs = entries.reduce((s, e) => s + entryHoursValue(e), 0);
+  document.getElementById('monBadge').textContent = `${formatHours(totHrs)} Total`;
   document.getElementById('monBody').innerHTML = entries.length
     ? entries
-        .map(
-          (en) => `<tr>
-        <td>${fmtD(en.date)}</td>
-        <td class="mono" style="font-size:13px;">${mStr(en.from)}</td>
-        <td class="mono" style="font-size:13px;">${mStr(en.to)}</td>
-        <td class="mono" style="font-size:12px;color:var(--t3);">${en.brk} min</td>
-        <td class="mono">${mDur(net(en))}</td>
-        <td style="color:var(--t2);font-size:13px;">${en.note || '—'}</td>
-        <td><div style="display:flex;gap:6px;">
-          <div class="ib" onclick="openEdit('${en.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
-          <div class="ib del" onclick="quickDel('${en.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
-        </div></td>
-      </tr>`
-        )
+        .map((en) => {
+          const alt = isLegacyEntry(en)
+            ? `<span class="entry-alt-badge" title="Aus Von/Bis berechnet">alt</span>`
+            : '';
+          const rowClass = isAbsenceEntry(en) ? 'entry-absence' : '';
+          return `<tr class="${rowClass}">
+        <td>${fmtD(en.date)}${alt}</td>
+        <td>${entryObjektCell(en)}</td>
+        <td>${escapeAttr(entryWorkLabel(en) || '—')}</td>
+        <td class="mono">${escapeAttr(formatHours(entryHoursValue(en)))}</td>
+        <td style="color:var(--t2);font-size:13px;">${escapeAttr(en.note || '—')}</td>
+        <td>${entryActionButtonsHtml(en)}</td>
+      </tr>`;
+        })
         .join('')
-    : `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--t3);">Keine Einträge für diesen Monat.</td></tr>`;
+    : `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--t3);">Keine Einträge für diesen Monat.</td></tr>`;
 }
 
-function renderDash() {
+function openRapporteOpenHours() {
+  if (!IS_ADMIN) return;
+  reportMode = 'open';
+  syncReportFilterUi();
+  showView('rapporte');
+}
+
+function openAnsaetzeFromDash() {
+  if (!IS_ADMIN) return;
+  sdTab = 'ansaetze';
+  showView('stammdaten');
+}
+
+function renderDashOpenBlock(stats) {
+  const hrsEl = document.getElementById('dOpenHrs');
+  const amtEl = document.getElementById('dOpenAmt');
+  const body = document.getElementById('dOpenBody');
+  const count = document.getElementById('dOpenCount');
+  const warn = document.getElementById('dOpenMissing');
+  if (!hrsEl || !amtEl || !body) return;
+
+  const totalHours = Number(stats?.totalHours || 0);
+  const totalAmount = Number(stats?.totalAmount || 0);
+  hrsEl.textContent = formatHours(totalHours);
+  amtEl.textContent = `netto CHF ${formatSwissChf(totalAmount)}`;
+
+  const sites = stats?.sites || [];
+  if (count) count.textContent = String(sites.length);
+
+  const missing = stats?.missingRate || { count: 0, hours: 0 };
+  if (warn) {
+    if (missing.count > 0) {
+      const n = missing.count;
+      const hLabel = formatHours(missing.hours);
+      warn.innerHTML =
+        `${n} ${n === 1 ? 'Eintrag hat' : 'Einträge haben'} keinen Ansatz (${escapeAttr(hLabel)}) und sind im Betrag nicht enthalten. ` +
+        `<a href="#" onclick="event.preventDefault();openAnsaetzeFromDash();">Ansätze in Stammdaten öffnen</a>`;
+      warn.style.display = 'block';
+    } else {
+      warn.innerHTML = '';
+      warn.style.display = 'none';
+    }
+  }
+
+  if (!sites.length) {
+    body.innerHTML =
+      '<tr><td colspan="4" style="color:var(--t3);padding:18px 10px;">Keine offenen verrechenbaren Stunden.</td></tr>';
+    return;
+  }
+
+  const rows = [];
+  for (const s of sites) {
+    const stale = Number(s.ageDays) > 21;
+    const amountCell =
+      s.missingRateCount > 0 && !(Number(s.amount) > 0)
+        ? '<span style="color:var(--saniga-red);font-weight:600;">Ansatz fehlt</span>'
+        : s.missingRateCount > 0
+          ? `CHF ${escapeAttr(formatSwissChf(s.amount))} <span style="color:var(--t3);font-size:11px;">(+ Ansatz fehlt)</span>`
+          : `CHF ${escapeAttr(formatSwissChf(s.amount))}`;
+    rows.push(`<tr class="${stale ? 'dash-open-stale' : ''}">
+      <td><strong>${escapeAttr(s.customerName)}</strong><div style="color:var(--t3);font-size:12px;margin-top:2px;">${escapeAttr(s.siteLabel)}</div></td>
+      <td class="mono">${escapeAttr(formatHours(s.hours))}</td>
+      <td>${amountCell}</td>
+      <td><span class="dash-open-age ${stale ? 'stale' : ''}">${escapeAttr(String(s.ageDays))} Tage</span><div style="color:var(--t3);font-size:11px;margin-top:2px;">seit ${escapeAttr(IsoWeek.formatDe(s.oldestDate))}</div></td>
+    </tr>`);
+  }
+  body.innerHTML = rows.join('');
+}
+
+async function renderDash() {
   const t = today();
   const m = currentMonthKey();
   const monName = MOS[+m.split('-')[1]];
   const wk = wkDates();
-  const act = EMPS.filter((e) => e.rate > 0 && ENTRIES.some((en) => en.empId === e.id && en.date === t)).length;
-  const wkM = ENTRIES.filter((e) => wk.includes(e.date)).reduce((s, e) => s + net(e), 0);
-  const monM = ENTRIES.filter((e) => e.date.startsWith(m)).reduce((s, e) => s + net(e), 0);
-  const soll = EMPS.filter((e) => e.rate > 0).reduce((s, e) => s + e.target * 4, 0);
-  const lohn = EMPS.filter((e) => e.rate > 0).reduce((s, e) => s + totH(e.id, m) * e.rate, 0);
-  document.getElementById('dAct').textContent = act;
+  const team = trackedEmps();
+  const teamIds = new Set(team.map((e) => e.id));
+  const wkM = ENTRIES.filter((e) => wk.includes(e.date) && teamIds.has(e.empId)).reduce(
+    (s, e) => s + net(e),
+    0
+  );
+  const monM = ENTRIES.filter((e) => e.date.startsWith(m) && teamIds.has(e.empId)).reduce(
+    (s, e) => s + net(e),
+    0
+  );
+  const soll = team.reduce((s, e) => s + (e.target || 0) * 4, 0);
+  // Same user set + month as Stunden card: Σ hours × hourlyRate
+  const lohn = team.reduce((s, e) => s + totH(e.id, m) * (e.rate || 0), 0);
   document.getElementById('dWk').textContent = formatHoursFromMinutes(wkM);
   const dMonLbl = document.getElementById('dMonLbl');
   const dLohnLbl = document.getElementById('dLohnLbl');
@@ -1039,7 +1863,7 @@ function renderDash() {
   document.getElementById('dLohn').textContent = `CHF ${Math.round(lohn).toLocaleString('de-CH')}.–`;
   document.getElementById('dKW').textContent = String(IsoWeek.getISOWeekPartsFromYmd(t).week);
 
-  document.getElementById('dTeam').innerHTML = EMPS.filter((e) => e.rate > 0)
+  document.getElementById('dTeam').innerHTML = team
     .map((e) => {
       const tM = ENTRIES.filter((en) => en.empId === e.id && en.date === t).reduce((s, en) => s + net(en), 0);
       const ok = tM > 0;
@@ -1052,27 +1876,40 @@ function renderDash() {
     })
     .join('');
 
-  document.getElementById('dWkProg').innerHTML = EMPS.filter((e) => e.rate > 0)
+  document.getElementById('dWkProg').innerHTML = team
     .map((e) => {
+      const target = e.target > 0 ? e.target : 45;
       const hrs = ENTRIES.filter((en) => en.empId === e.id && wk.includes(en.date)).reduce((s, en) => s + net(en), 0) / 60;
-      const pct = Math.min(100, Math.round((hrs / e.target) * 100));
+      const pct = Math.min(100, Math.round((hrs / target) * 100));
       const col = pct >= 95 ? 'var(--green)' : pct >= 70 ? 'var(--saniga-red)' : 'var(--red)';
       return `<div>
       <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
         <span style="font-size:13px;font-weight:500;">${e.first} ${e.last}</span>
-        <span class="mono" style="font-size:12px;color:var(--t2);">${formatHours(hrs)} / ${formatHours(e.target)}</span>
+        <span class="mono" style="font-size:12px;color:var(--t2);">${formatHours(hrs)} / ${formatHours(target)}</span>
       </div>
       <div class="pb"><div class="pf" style="width:${pct}%;background:${col};"></div></div>
     </div>`;
     })
     .join('');
+
+  try {
+    const openStats = await api('/dashboard/open');
+    renderDashOpenBlock(openStats);
+  } catch (e) {
+    renderDashOpenBlock({ totalHours: 0, totalAmount: 0, sites: [], missingRate: { count: 0, hours: 0 } });
+    const warn = document.getElementById('dOpenMissing');
+    if (warn) {
+      warn.textContent = e.message || 'Offene Stunden konnten nicht geladen werden.';
+      warn.style.display = 'block';
+    }
+  }
 }
 
 function renderTeamProfile() {
   const ph = document.getElementById('teamProfPlaceholder');
   const body = document.getElementById('teamProfBody');
   if (!ph || !body) return;
-  const list = EMPS.filter((x) => x.rate > 0);
+  const list = trackedEmps();
   const e = teamSelEmpId != null ? ge(teamSelEmpId) : null;
   const valid = e && list.some((x) => x.id === e.id);
   if (!valid) {
@@ -1097,6 +1934,8 @@ function renderTeamProfile() {
   document.getElementById('teamProfMonthCap').textContent = `Im Monat · ${monthGermanLabel(m)}`;
   document.getElementById('teamProfHours').textContent = `${mH.toFixed(1)} h`;
   document.getElementById('teamProfLohn').textContent = `CHF ${l.toLocaleString('de-CH')}`;
+  const delBtn = body.querySelector('button[onclick="deleteTeamEmployee()"]');
+  if (delBtn) delBtn.style.display = e.userRole === 'ADMIN' ? 'none' : '';
   const entries = eEmp(e.id, m).sort((a, b) => (a.date > b.date ? -1 : 1)).slice(0, 8);
   document.getElementById('teamProfEntries').innerHTML = entries.length
     ? entries
@@ -1140,7 +1979,7 @@ async function deleteTeamEmployee() {
 function renderTeam() {
   const grid = document.getElementById('teamGrid');
   if (!grid) return;
-  const list = EMPS.filter((e) => e.rate > 0);
+  const list = trackedEmps();
   if (teamSelEmpId != null && !list.some((e) => e.id === teamSelEmpId)) teamSelEmpId = null;
   const m = teamProfileMonth();
   const mLabel = monthGermanLabel(m);
@@ -1307,7 +2146,7 @@ function payrollReset() {
 }
 
 function fillLohnSel() {
-  document.getElementById('lEmpSel').innerHTML = EMPS.filter((e) => e.rate > 0)
+  document.getElementById('lEmpSel').innerHTML = trackedEmps()
     .map((e) => `<option value="${e.id}">${formatEmpSelectLabel(e)}</option>`)
     .join('');
 }
@@ -1388,36 +2227,104 @@ function renderLohn() {
     .join('');
 }
 
+async function ensureAlleFilterData() {
+  const needsCust = !CUSTOMERS.length;
+  const needsSites = !SITES.length;
+  const needsWt = !WORK_TYPES.length;
+  if (!needsCust && !needsSites && !needsWt) return;
+  const jobs = [];
+  if (needsCust) jobs.push(api('/customers').then((r) => { CUSTOMERS = r.customers || []; }));
+  if (needsSites) jobs.push(api('/sites').then((r) => { SITES = r.sites || []; }));
+  if (needsWt) jobs.push(api('/work-types').then((r) => { WORK_TYPES = r.workTypes || []; }));
+  await Promise.all(jobs);
+}
+
 function fillAlleSel() {
-  document.getElementById('aEmpF').innerHTML =
-    '<option value="">Alle Mitarbeiter</option>' + EMPS.map((e) => `<option value="${e.id}">${e.first} ${e.last}</option>`).join('');
+  const empSel = document.getElementById('aEmpF');
+  const custSel = document.getElementById('aCustF');
+  const wtSel = document.getElementById('aWtF');
+  if (empSel) {
+    const prev = empSel.value;
+    empSel.innerHTML =
+      '<option value="">Alle</option>' +
+      trackedEmps()
+        .map((e) => `<option value="${escapeAttr(e.id)}">${escapeAttr(e.first)} ${escapeAttr(e.last)}</option>`)
+        .join('');
+    if (prev) empSel.value = prev;
+  }
+  if (custSel) {
+    const prev = custSel.value;
+    custSel.innerHTML =
+      '<option value="">Alle</option>' +
+      CUSTOMERS.map((c) => `<option value="${escapeAttr(c.id)}">${escapeAttr(c.name)}</option>`).join('');
+    if (prev) custSel.value = prev;
+  }
+  if (wtSel) {
+    const prev = wtSel.value;
+    const types = WORK_TYPES.filter((w) => w.active !== false);
+    wtSel.innerHTML =
+      '<option value="">Alle</option>' +
+      types.map((w) => `<option value="${escapeAttr(w.id)}">${escapeAttr(w.label)}</option>`).join('');
+    if (prev) wtSel.value = prev;
+  }
 }
 
 function renderAlle() {
-  const eid = document.getElementById('aEmpF').value || '';
-  const fr = document.getElementById('aFrom').value;
-  const to = document.getElementById('aTo').value;
-  const f = ENTRIES.filter((en) => (!eid || en.empId === eid) && (!fr || en.date >= fr) && (!to || en.date <= to)).sort((a, b) => (a.date > b.date ? -1 : 1));
-  document.getElementById('aCount').textContent = `${f.length} Einträge`;
+  ensureAlleFilterData()
+    .then(() => {
+      fillAlleSel();
+      renderAlleTable();
+    })
+    .catch((e) => {
+      const body = document.getElementById('aBody');
+      if (body) {
+        body.innerHTML = `<tr><td colspan="8" style="color:var(--red);">${escapeAttr(e.message)}</td></tr>`;
+      }
+    });
+}
+
+function renderAlleTable() {
+  const eid = document.getElementById('aEmpF')?.value || '';
+  const fr = document.getElementById('aFrom')?.value || '';
+  const to = document.getElementById('aTo')?.value || '';
+  const custId = document.getElementById('aCustF')?.value || '';
+  const wtId = document.getElementById('aWtF')?.value || '';
+  const f = ENTRIES.filter((en) => {
+    if (eid && en.empId !== eid) return false;
+    if (fr && en.date < fr) return false;
+    if (to && en.date > to) return false;
+    if (wtId && en.workTypeId !== wtId) return false;
+    if (custId) {
+      const site = SITES.find((s) => s.id === en.siteId);
+      const cId = site?.customerId || site?.customer?.id;
+      if (cId !== custId) return false;
+    }
+    return true;
+  }).sort((a, b) => (a.date > b.date ? -1 : 1));
+
+  const totHrs = f.reduce((s, e) => s + entryHoursValue(e), 0);
+  const aCount = document.getElementById('aCount');
+  const aHours = document.getElementById('aHoursTotal');
+  if (aCount) aCount.textContent = `${f.length} Einträge`;
+  if (aHours) aHours.textContent = formatHours(totHrs);
+
   document.getElementById('aBody').innerHTML = f.length
     ? f
         .map((en) => {
-          const e = ge(en.empId);
-          return `<tr>
+          const e = ge(en.empId) || { first: '?', last: '', color: '#94a3b8' };
+          const rowClass = isAbsenceEntry(en) ? 'entry-absence' : '';
+          return `<tr class="${rowClass}">
       <td><div style="display:flex;align-items:center;gap:8px;">
         <div style="width:28px;height:28px;border-radius:50%;background:${e.color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;">${ini(e)}</div>
-        ${e.first} ${e.last}
+        ${escapeAttr(e.first)} ${escapeAttr(e.last)}
       </div></td>
-      <td class="mono" style="font-size:13px;">${fmtD(en.date)}</td>
-      <td class="mono" style="font-size:13px;">${mStr(en.from)}</td>
-      <td class="mono" style="font-size:13px;">${mStr(en.to)}</td>
-      <td class="mono" style="font-size:12px;color:var(--t3);">${en.brk} min</td>
-      <td class="mono">${mDur(net(en))}</td>
-      <td style="color:var(--t2);font-size:13px;">${en.note || '—'}</td>
-      <td><div style="display:flex;gap:6px;">
-        <div class="ib" onclick="openEdit('${en.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
-        <div class="ib del" onclick="quickDel('${en.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
-      </div></td>
+      <td class="mono" style="font-size:13px;">${fmtD(en.date)}${isLegacyEntry(en) ? '<span class="entry-alt-badge">alt</span>' : ''}</td>
+      <td>${entryObjektCell(en)}</td>
+      <td>${escapeAttr(entryWorkLabel(en) || '—')}</td>
+      <td class="mono">${escapeAttr(formatHours(entryHoursValue(en)))}</td>
+      <td style="font-size:12px;font-weight:600;color:var(--t2);">${escapeAttr(entryStatusLabel(en))}</td>
+      <td style="color:var(--t2);font-size:13px;">${escapeAttr(en.note || '—')}</td>
+      <td>${entryActionButtonsHtml(en)}</td>
     </tr>`;
         })
         .join('')
@@ -1470,17 +2377,42 @@ function fillEntryWorkTypeSelect(selectedId) {
   const sel = document.getElementById('eWorkType');
   if (!sel) return;
   const active = WORK_TYPES.filter((w) => w.active !== false);
+  const arbeit = active.filter((w) => w.billable !== false);
+  const absenz = active.filter((w) => w.billable === false);
   if (!active.length) {
     sel.innerHTML = '<option value="">Keine aktive Arbeitsart</option>';
     return;
   }
-  sel.innerHTML = active
-    .map(
-      (w) =>
-        `<option value="${escapeAttr(w.id)}" ${w.id === selectedId ? 'selected' : ''}>${escapeAttr(w.label)}</option>`
-    )
-    .join('');
+  const opt = (w) =>
+    `<option value="${escapeAttr(w.id)}" ${w.id === selectedId ? 'selected' : ''}>${escapeAttr(w.label)}</option>`;
+  let html = '';
+  if (arbeit.length) {
+    html += `<optgroup label="Arbeit">${arbeit.map(opt).join('')}</optgroup>`;
+  }
+  if (absenz.length) {
+    html += `<optgroup label="Absenz">${absenz.map(opt).join('')}</optgroup>`;
+  }
+  sel.innerHTML = html;
   if (selectedId && active.some((w) => w.id === selectedId)) sel.value = selectedId;
+  onEntryWorkTypeChange();
+}
+
+function selectedEntryWorkType() {
+  const id = document.getElementById('eWorkType')?.value;
+  return WORK_TYPES.find((w) => w.id === id) || null;
+}
+
+function onEntryWorkTypeChange() {
+  const wt = selectedEntryWorkType();
+  const isAbsence = wt && wt.billable === false;
+  const siteFg = document.getElementById('eSiteFg');
+  const hoursLabel = document.getElementById('eHoursLabel');
+  if (siteFg) siteFg.style.display = isAbsence ? 'none' : '';
+  if (hoursLabel) {
+    hoursLabel.textContent = isAbsence
+      ? 'Stunden (z.B. 8 für einen ganzen Tag)'
+      : 'Stunden';
+  }
 }
 
 function calcPreview() {
@@ -1535,14 +2467,19 @@ function openAddDate(d) {
 async function openEdit(id) {
   const en = ENTRIES.find((e) => e.id === id);
   if (!en) return;
+  if (isEntryInvoiced(en)) {
+    toast(`Verrechnet auf Rechnung ${en.invoiceNumber} — Bearbeitung gesperrt`);
+    return;
+  }
   showEntryErr('');
   editId = id;
   fillEntryEmp(en.empId);
   document.getElementById('mEntryTitle').textContent = 'Eintrag bearbeiten';
-  document.getElementById('mEntrySub').textContent = 'Passe Objekt, Arbeit und Stunden an und speichere.';
+  document.getElementById('mEntrySub').textContent = 'Passe Datum, Arbeit/Absenz und Stunden an und speichere.';
   document.getElementById('eDate').value = en.date;
-  document.getElementById('eHours').value =
-    en.hours != null ? String(en.hours) : String(Math.max(0.5, Math.round((net(en) / 60) * 2) / 2));
+  document.getElementById('eHours').value = String(
+    Math.max(0.5, Math.round(entryHoursValue(en) * 2) / 2)
+  );
   document.getElementById('eNote').value = en.note || '';
   document.getElementById('eDel').style.display = '';
   try {
@@ -1555,63 +2492,170 @@ async function openEdit(id) {
   document.getElementById('moEntry').classList.add('open');
 }
 
-async function saveEntry() {
-  showEntryErr('');
+function collectEntryForm() {
   const empId = document.getElementById('eEmp').value;
   const date = document.getElementById('eDate').value;
-  const siteId = document.getElementById('eSite').value;
   const workTypeId = document.getElementById('eWorkType').value;
   const hours = Number(document.getElementById('eHours').value);
   const note = document.getElementById('eNote').value.trim();
+  const wt = WORK_TYPES.find((w) => w.id === workTypeId);
+  const isAbsence = wt && wt.billable === false;
+  const siteId = isAbsence ? null : document.getElementById('eSite').value;
 
-  if (!date) {
-    showEntryErr('Bitte ein Datum wählen.');
+  if (!date) return { error: 'Bitte ein Datum wählen.' };
+  if (!workTypeId) return { error: 'Bitte eine Arbeitsart wählen.' };
+  if (!isAbsence && !siteId) {
+    return { error: 'Für verrechenbare Arbeit ist ein Objekt erforderlich.' };
+  }
+  const hoursCheck = EntryLimits.validateEntryHours(hours);
+  if (!hoursCheck.ok) return { error: hoursCheck.error };
+  const dateCheck = EntryLimits.validateEntryDate(date, {
+    todayYmd: IsoWeek.zonedYmd(new Date()),
+    isAdmin: IS_ADMIN,
+  });
+  if (!dateCheck.ok) return { error: dateCheck.error };
+
+  const payload = { date, siteId, workTypeId, hours: hoursCheck.hours, note };
+  if (IS_ADMIN) payload.userId = empId;
+  return { payload, empId, hours: hoursCheck.hours, wt };
+}
+
+function localDailyTotal(empId, date, addHours, excludeId) {
+  const others = ENTRIES.filter(
+    (en) => en.empId === empId && en.date === date && en.id !== excludeId
+  );
+  const sum = others.reduce((s, en) => s + entryHoursValue(en), 0);
+  return EntryLimits.round1(sum + Number(addHours));
+}
+
+function findDuplicateEntries(empId, date, siteId, workTypeId, excludeId) {
+  return ENTRIES.filter(
+    (en) =>
+      en.empId === empId &&
+      en.date === date &&
+      (en.siteId || null) === (siteId || null) &&
+      en.workTypeId === workTypeId &&
+      en.id !== excludeId
+  );
+}
+
+function showEntryConfirmDialog({ dailyTotal, needsDailyConfirm, duplicates, wt }) {
+  const body = document.getElementById('entryConfirmBody');
+  const err = document.getElementById('entryConfirmErr');
+  if (err) {
+    err.style.display = 'none';
+    err.textContent = '';
+  }
+  const parts = [];
+  if (needsDailyConfirm) {
+    parts.push(
+      `<p style="margin:0 0 10px;"><strong>Hohes Tages-Total:</strong> Nach dem Speichern wären es <strong>${escapeAttr(EntryLimits.formatHoursDe(dailyTotal))} Stunden</strong> an diesem Tag (Schwelle ${EntryLimits.DAILY_HOURS_WARN} h). Ist das korrekt?</p>`
+    );
+  }
+  if (duplicates.length) {
+    const list = duplicates
+      .map(
+        (en) =>
+          `<li>${escapeAttr(fmtD(en.date))} · ${escapeAttr(formatHours(entryHoursValue(en)))} · ${escapeAttr(entryWorkLabel(en) || '—')}${en.note ? ` · ${escapeAttr(en.note)}` : ''}</li>`
+      )
+      .join('');
+    parts.push(
+      `<p style="margin:0 0 6px;"><strong>Möglicher Duplikat:</strong> Es gibt bereits einen Eintrag für denselben Mitarbeiter, dasselbe Datum, Objekt und ${escapeAttr(wt?.billable === false ? 'Absenz' : 'Arbeitsart')}.</p><ul style="margin:0;padding-left:18px;">${list}</ul>`
+    );
+  }
+  if (body) body.innerHTML = parts.join('') || '<p>Bitte bestätigen.</p>';
+  document.getElementById('moEntryConfirm').classList.add('open');
+}
+
+async function persistEntryPayload(payload) {
+  if (editId) {
+    await api(`/time-entries/${editId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    toast('Eintrag aktualisiert ✓');
+  } else {
+    await api('/time-entries', { method: 'POST', body: JSON.stringify(payload) });
+    toast('Eintrag gespeichert ✓');
+  }
+  pendingEntrySave = null;
+  closeM('moEntryConfirm');
+  closeM('moEntry');
+  await loadData();
+  refreshCur();
+}
+
+async function saveEntry() {
+  showEntryErr('');
+  const collected = collectEntryForm();
+  if (collected.error) {
+    showEntryErr(collected.error);
     return;
   }
-  if (!siteId) {
-    showEntryErr('Bitte ein Objekt wählen.');
-    return;
-  }
-  if (!workTypeId) {
-    showEntryErr('Bitte eine Arbeitsart wählen.');
-    return;
-  }
-  if (!hours || hours < 0.5 || hours > 24) {
-    showEntryErr('Stunden müssen zwischen 0.5 und 24 liegen.');
+  const { payload, empId, hours, wt } = collected;
+  const dailyTotal = localDailyTotal(empId, payload.date, hours, editId);
+  const needsDailyConfirm = dailyTotal > EntryLimits.DAILY_HOURS_WARN;
+  const duplicates = findDuplicateEntries(
+    empId,
+    payload.date,
+    payload.siteId,
+    payload.workTypeId,
+    editId
+  );
+
+  if (needsDailyConfirm || duplicates.length) {
+    pendingEntrySave = { payload, needsDailyConfirm };
+    showEntryConfirmDialog({ dailyTotal, needsDailyConfirm, duplicates, wt });
     return;
   }
 
-  const payload = {
-    date,
-    siteId,
-    workTypeId,
-    hours,
-    note,
-  };
   try {
-    if (editId) {
-      if (IS_ADMIN) payload.userId = empId;
-      await api(`/time-entries/${editId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(payload),
-      });
-      toast('Eintrag aktualisiert ✓');
-    } else {
-      const body = { ...payload };
-      if (IS_ADMIN) body.userId = empId;
-      await api('/time-entries', { method: 'POST', body: JSON.stringify(body) });
-      toast('Eintrag gespeichert ✓');
-    }
-    await loadData();
-    closeM('moEntry');
-    refreshCur();
+    await persistEntryPayload(payload);
   } catch (e) {
+    if (e.status === 409 && e.data?.code === 'DAILY_TOTAL') {
+      pendingEntrySave = { payload, needsDailyConfirm: true };
+      showEntryConfirmDialog({
+        dailyTotal: e.data.dailyTotal,
+        needsDailyConfirm: true,
+        duplicates,
+        wt,
+      });
+      return;
+    }
     showEntryErr(e.message);
+  }
+}
+
+async function confirmSaveEntry() {
+  if (!pendingEntrySave) return;
+  const btn = document.getElementById('entryConfirmBtn');
+  const err = document.getElementById('entryConfirmErr');
+  if (btn) btn.disabled = true;
+  if (err) {
+    err.style.display = 'none';
+    err.textContent = '';
+  }
+  const payload = { ...pendingEntrySave.payload };
+  if (pendingEntrySave.needsDailyConfirm) payload.confirmDailyTotal = true;
+  try {
+    await persistEntryPayload(payload);
+  } catch (e) {
+    if (err) {
+      err.textContent = e.message || 'Speichern fehlgeschlagen';
+      err.style.display = 'block';
+    }
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
 async function deleteEntry() {
   if (!editId) return;
+  const en = ENTRIES.find((e) => e.id === editId);
+  if (en && isEntryInvoiced(en)) {
+    showEntryErr(`Verrechnet auf Rechnung ${en.invoiceNumber} — Löschen gesperrt`);
+    return;
+  }
   try {
     await api(`/time-entries/${editId}`, { method: 'DELETE' });
     await loadData();
@@ -1619,11 +2663,16 @@ async function deleteEntry() {
     toast('Eintrag gelöscht');
     refreshCur();
   } catch (e) {
-    toast(e.message);
+    showEntryErr(e.message);
   }
 }
 
 async function quickDel(id) {
+  const en = ENTRIES.find((e) => e.id === id);
+  if (en && isEntryInvoiced(en)) {
+    toast(`Verrechnet auf Rechnung ${en.invoiceNumber} — Löschen gesperrt`);
+    return;
+  }
   if (!confirm('Eintrag wirklich löschen?')) return;
   try {
     await api(`/time-entries/${id}`, { method: 'DELETE' });
@@ -1740,7 +2789,7 @@ async function saveEditEmp() {
     showEmpErr('editEmpErr', 'Vor- und Nachname sind erforderlich.');
     return;
   }
-  if (!(hourlyRate >= 0) || !(weeklyHours >= 1 && weeklyHours <= 60)) {
+  if (!(hourlyRate >= 0) || !(weeklyHours >= 0 && weeklyHours <= 60)) {
     showEmpErr('editEmpErr', 'Bitte gültigen Stundenlohn und Soll-Stunden prüfen.');
     return;
   }
@@ -1784,17 +2833,14 @@ function initAfterLogin() {
   document.getElementById('aTo').value = `${cm}-${String(last).padStart(2, '0')}`;
   applyRoleUI();
   document.getElementById('eEmpFg').classList.toggle('hidden', !IS_ADMIN);
-  if (IS_ADMIN && EMPS.length) {
-    curUser = EMPS[0].id;
-    fillUserSwitcher();
-    document.getElementById('userSwitcher').value = curUser;
-  } else {
-    curUser = ME.id;
-    fillUserSwitcher();
-  }
+  ensureSelfInEmps();
+  curUser = ME.id;
+  fillUserSwitcher();
+  const sw = document.getElementById('userSwitcher');
+  if (sw) sw.value = curUser;
   syncSidebarFromCur();
   tick();
-  showView('meine');
+  showView(IS_ADMIN ? 'dashboard' : 'meine');
   startEntrySync();
 }
 
