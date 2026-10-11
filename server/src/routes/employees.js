@@ -4,6 +4,7 @@ const { prisma } = require('../lib/prisma');
 const { hashPassword } = require('../lib/password');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { toPublicUser } = require('../lib/userDto');
+const { ensureSwissHolidays } = require('../lib/ensureSwissHolidays');
 
 const router = express.Router();
 
@@ -68,6 +69,9 @@ router.post('/', requireAdmin, async (req, res) => {
       avatarColor: COLS[count % COLS.length],
     },
   });
+  if (user.isTimeTracked) {
+    await ensureSwissHolidays(prisma, { userIds: [user.id] });
+  }
   res.status(201).json({ employee: toPublicUser(user) });
 });
 
@@ -89,6 +93,9 @@ router.patch('/:id', requireAdmin, async (req, res) => {
   if (parsed.data.isTimeTracked !== undefined) data.isTimeTracked = parsed.data.isTimeTracked;
   if (parsed.data.avatarColor !== undefined) data.avatarColor = parsed.data.avatarColor;
   const user = await prisma.user.update({ where: { id: target.id }, data });
+  if (user.isTimeTracked && data.isTimeTracked === true) {
+    await ensureSwissHolidays(prisma, { userIds: [user.id] });
+  }
   res.json({ employee: toPublicUser(user) });
 });
 

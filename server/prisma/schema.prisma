@@ -35,26 +35,29 @@ model User {
 }
 
 model TimeEntry {
-  id           String    @id @default(cuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  date         String
-  fromMinutes  Int
-  toMinutes    Int
-  breakMinutes Int       @default(0)
-  note         String    @default("")
-  siteId       String?
-  site         Site?     @relation(fields: [siteId], references: [id])
-  workTypeId   String?
-  workType     WorkType? @relation(fields: [workTypeId], references: [id])
-  hours        Decimal?  @db.Decimal(5, 2)
-  invoiceId    String?
-  invoice      Invoice?  @relation(fields: [invoiceId], references: [id])
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date            String
+  fromMinutes     Int
+  toMinutes       Int
+  breakMinutes    Int       @default(0)
+  note            String    @default("")
+  siteId          String?
+  site            Site?     @relation(fields: [siteId], references: [id])
+  workTypeId      String?
+  workType        WorkType? @relation(fields: [workTypeId], references: [id])
+  hours           Decimal?  @db.Decimal(5, 2)
+  invoiceId       String?
+  invoice         Invoice?  @relation(fields: [invoiceId], references: [id])
+  /** Links all weekday rows created by one Absenz-Erfassung. */
+  absenceGroupId  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([userId, date])
   @@index([invoiceId])
+  @@index([absenceGroupId])
 }
 
 model Customer {

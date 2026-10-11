@@ -62,6 +62,7 @@ function toEntryDto(e) {
     invoiceNumber: inv ? inv.number : null,
     billable: e.workType ? !!e.workType.billable : true,
     workTypeLabel: e.workType?.label || null,
+    absenceGroupId: e.absenceGroupId || null,
     createdAt: e.createdAt,
     updatedAt: e.updatedAt,
   };
@@ -96,17 +97,17 @@ async function resolveSiteForWorkType(workTypeId, siteId) {
   if (!wt) {
     return { error: 'Ungültige Arbeitsart' };
   }
-  if (wt.billable) {
-    if (!siteId) {
-      return { error: SITE_REQUIRED_MSG };
-    }
-    const site = await prisma.site.findFirst({ where: { id: siteId, active: true } });
-    if (!site) {
-      return { error: 'Ungültiges Objekt' };
-    }
-    return { workType: wt, siteId };
+  if (!wt.billable) {
+    return { error: 'Absenzen bitte unter «Absenzen» erfassen.' };
   }
-  return { workType: wt, siteId: null };
+  if (!siteId) {
+    return { error: SITE_REQUIRED_MSG };
+  }
+  const site = await prisma.site.findFirst({ where: { id: siteId, active: true } });
+  if (!site) {
+    return { error: 'Ungültiges Objekt' };
+  }
+  return { workType: wt, siteId };
 }
 
 function resolveHours(body) {

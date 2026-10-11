@@ -7,6 +7,7 @@ const { signToken } = require('../lib/jwt');
 const { toPublicUser } = require('../lib/userDto');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { authRateLimiter } = require('../lib/rateLimit');
+const { ensureSwissHolidays } = require('../lib/ensureSwissHolidays');
 
 const router = express.Router();
 const acceptLimiter = authRateLimiter({ max: 20 });
@@ -135,6 +136,8 @@ router.post('/:token/accept', acceptLimiter, async (req, res) => {
     });
     return created;
   });
+
+  await ensureSwissHolidays(prisma, { userIds: [user.id] });
 
   const jwt = signToken({ sub: user.id, role: user.role });
   res.status(201).json({ token: jwt, user: toPublicUser(user) });

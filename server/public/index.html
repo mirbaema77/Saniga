@@ -2,9 +2,15 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#12B8E1"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="Saniga"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <title>Saniga AG – Zeiterfassung</title>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="/assets/logo-saniga.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -69,11 +75,12 @@ body {
   display:flex; flex-direction:column; align-items:flex-start; gap:8px;
 }
 .logo-img {
-  height: 36px;
+  height: 32px;
   width: auto;
-  max-width: 220px;
+  max-width: 160px;
   display: block;
   object-fit: contain;
+  object-position: left center;
 }
 .logo-sub  { font-size:10px;color:rgba(255,255,255,.34);font-family:'JetBrains Mono';letter-spacing:.5px; }
 .nav { padding:12px 10px;flex:1; }
@@ -348,6 +355,9 @@ select option { background:white; }
 .mo.open .mo-box { transform:scale(1) translateY(0); }
 .mo-title { font-size:20px;font-weight:800;color:var(--t1);margin-bottom:5px; }
 .mo-sub { font-size:13px;color:var(--t2);margin-bottom:22px; }
+.mo-sheet-head { margin-bottom: 8px; }
+.mo-sheet-head .mo-sub { margin-bottom: 0; }
+.mo-sheet-close { display: none; }
 .mo-actions { display:flex;justify-content:flex-end;gap:10px;margin-top:24px; }
 
 /* ── ENTRY LIST ── */
@@ -361,7 +371,11 @@ select option { background:white; }
 .ei-note { font-size:13px;color:var(--t3);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 .ei-acts { display:flex;gap:6px;opacity:0;transition:opacity .15s; }
 .ei:hover .ei-acts { opacity:1; }
-.ib { width:28px;height:28px;border-radius:7px;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s; }
+.entry-acts { display:flex; }
+.entry-acts-icons { display:flex; gap:6px; }
+.entry-acts-btns { display:none; gap:8px; width:100%; }
+.entry-acts-btns .btn { flex:1; justify-content:center; min-height:44px; }
+.ib { width:28px;height:28px;border-radius:7px;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .12s; padding:0; font:inherit; color:inherit; appearance:none; -webkit-appearance:none; }
 .ib.disabled { opacity:.4; cursor:not-allowed; pointer-events:auto; }
 .ib.disabled:hover { background:var(--bg); border-color:var(--border); color:inherit; }
 .entry-alt-badge {
@@ -472,6 +486,714 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   padding:12px 16px;
   margin-bottom:16px;
 }
+
+/* Mobile helpers (hidden on desktop) */
+.mobile-bottom-nav,
+.mobile-fab,
+.mobile-cards,
+.topbar-user,
+.topbar-logo,
+.desktop-hide { display: none; }
+
+/* ═══ PHONE LAYOUT (< 768px) — employee shell ═══ */
+@media (max-width: 767px) {
+  html, body { overflow-x: hidden; max-width: 100vw; }
+  .app { flex-direction: column; min-height: 100dvh; max-width: 100vw; overflow-x: hidden; }
+
+  .sidebar {
+    display: none !important;
+  }
+
+  :root {
+    --mnav-h: calc(64px + env(safe-area-inset-bottom, 0px));
+    --mfab-h: 52px;
+    --mfab-gap: 14px;
+  }
+  .main { width: 100%; min-width: 0; padding-bottom: calc(var(--mnav-h) + 8px); }
+  .topbar {
+    height: 56px; padding: 0 14px; gap: 10px;
+    justify-content: space-between;
+  }
+  .topbar-title { display: none; }
+  .topbar-user {
+    display: block !important;
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--t1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  .topbar-actions {
+    flex: 0 0 auto; gap: 8px; flex-wrap: nowrap;
+    justify-content: flex-end; min-width: 0;
+    align-items: center;
+  }
+  .topbar-actions .admin-only-nav,
+  .topbar-actions #inviteLink,
+  .topbar-actions #userSwitchWrap,
+  .topbar-actions .topbar-date,
+  .topbar-actions #logoutBtn { display: none !important; }
+  .topbar-logo {
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    height: 40px;
+    padding: 0;
+    text-decoration: none;
+  }
+  .topbar-logo img {
+    height: 24px;
+    width: auto;
+    max-width: 118px;
+    display: block;
+    object-fit: contain;
+    object-position: right center;
+  }
+  .topbar-btn {
+    min-height: 44px; min-width: 44px; padding: 10px 12px; font-size: 13px;
+    flex-shrink: 0;
+    touch-action: manipulation;
+  }
+
+  .content {
+    padding: 14px 14px calc(var(--mnav-h) + 16px);
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 90;
+    height: var(--mnav-h);
+    box-sizing: border-box;
+    background: #0f1f25;
+    border-top: 1px solid rgba(255,255,255,.1);
+    padding: 6px 2px calc(8px + env(safe-area-inset-bottom, 0px));
+    justify-content: space-between;
+    gap: 0;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .mobile-bottom-nav .mbnav-item {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px;
+    min-height: 52px;
+    padding: 10px 2px;
+    border: none; background: transparent;
+    color: rgba(255,255,255,.5);
+    font-family: inherit; font-size: 10px; font-weight: 650;
+    letter-spacing: 0.01em;
+    border-radius: 12px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .mobile-bottom-nav .mbnav-item svg {
+    width: 24px; height: 24px; stroke-width: 2;
+    pointer-events: none;
+  }
+  .mobile-bottom-nav .mbnav-item.active {
+    color: #fff;
+    background: rgba(18,184,225,.18);
+  }
+  .mobile-bottom-nav .mbnav-item.active svg {
+    stroke: #5fd4f0;
+  }
+  .mobile-bottom-nav .mbnav-item.is-pressed,
+  .mobile-bottom-nav .mbnav-item:active {
+    background: rgba(255,255,255,.1);
+  }
+
+  .mobile-fab {
+    display: none;
+    pointer-events: none;
+    position: fixed;
+    left: 14px; right: 14px;
+    bottom: calc(var(--mnav-h) + var(--mfab-gap));
+    z-index: 80;
+    height: var(--mfab-h);
+    min-height: var(--mfab-h);
+    align-items: center; justify-content: center; gap: 8px;
+    border: none; border-radius: 14px;
+    background: linear-gradient(135deg,#12B8E1,#3dc4ea);
+    color: #fff; font-family: inherit; font-size: 16px; font-weight: 700;
+    box-shadow: 0 8px 24px rgba(18,184,225,.35);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .mobile-fab.show {
+    display: flex;
+    pointer-events: auto;
+  }
+  .mobile-fab svg { width: 20px; height: 20px; }
+  #view-meine .quick-add { display: none; }
+  body.mobile-meine-open .content {
+    padding-bottom: calc(var(--mnav-h) + var(--mfab-h) + var(--mfab-gap) + 20px);
+  }
+
+  .grid2 { grid-template-columns: 1fr !important; gap: 14px; }
+  .wstrip {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+    overflow: visible;
+    margin: 0 0 14px;
+    padding: 0;
+  }
+  .wd {
+    flex: unset;
+    min-width: 0;
+    width: auto;
+    min-height: 62px;
+    padding: 6px 2px 10px;
+    border-radius: 10px;
+    touch-action: manipulation;
+  }
+  .wd:hover { transform: none; }
+  .wd-n { font-size: 9px; letter-spacing: 0.04em; }
+  .wd-d { font-size: 15px; font-weight: 800; margin: 1px 0; }
+  .wd-h { font-size: 9px; }
+  .wd.has-entry::after { bottom: 4px; width: 4px; height: 4px; }
+
+  /* Meine Zeiten — clean week list */
+  #view-meine .grid2 { display: flex; flex-direction: column; gap: 14px; }
+  #view-meine .grid2 > div:last-child { order: -1; }
+  #view-meine .meine-progress {
+    padding: 14px 16px !important;
+    margin-bottom: 0 !important;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+  #view-meine .meine-progress #mHrs { font-size: 26px !important; }
+  #view-meine .meine-week-card {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
+  #view-meine .meine-week-card .card-header {
+    padding: 0 2px 10px;
+    margin-bottom: 0;
+    border-bottom: none;
+  }
+  #wkList { display: flex; flex-direction: column; gap: 12px; padding: 0; }
+  .ei.entry-card {
+    display: flex; flex-direction: column; align-items: stretch; gap: 0;
+    padding: 0; border: 1px solid var(--border); border-radius: 16px;
+    border-bottom: 1px solid var(--border); background: #fff;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(21,40,48,.04);
+  }
+  .ei.entry-card:hover { background: #fff; }
+  .ei.entry-card .ei-dot { display: none; }
+  .ei.entry-card .ei-time,
+  .ei.entry-card .ei-note,
+  .entry-card-line1,
+  .entry-card-line2,
+  .entry-card-line3 { display: none; }
+  .ec-body { padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ec-top {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  }
+  .ec-date {
+    font-size: 13px; font-weight: 650; color: var(--t2);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .ec-hours {
+    font-size: 20px; font-weight: 800; color: var(--saniga-red);
+    font-family: 'JetBrains Mono', monospace; line-height: 1; flex-shrink: 0;
+  }
+  .ec-work {
+    font-size: 17px; font-weight: 750; color: var(--t1); line-height: 1.25;
+  }
+  .ec-project {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 10px 12px;
+    background: #f3f7f9;
+    border-radius: 12px;
+  }
+  .ec-customer {
+    font-size: 12px; font-weight: 650; color: var(--t3);
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .ec-site {
+    font-size: 14px; font-weight: 650; color: var(--t1); line-height: 1.3;
+  }
+  .ec-note {
+    font-size: 13px; color: var(--t2); line-height: 1.4;
+    padding-top: 2px;
+  }
+  .ec-note:empty { display: none; }
+  .ei.entry-card .ei-acts {
+    display: flex; width: 100%; opacity: 1;
+    padding: 0 12px 12px; margin: 0;
+  }
+  .ei.entry-card.entry-absence .ec-project { background: rgba(124,58,237,.08); }
+  .entry-acts-icons { display: none !important; }
+  .entry-acts-btns { display: flex !important; }
+  .entry-acts-btns .btn { min-height: 44px; border-radius: 11px; }
+  .m-card .entry-acts-icons { display: none !important; }
+  .m-card .entry-acts-btns { display: flex !important; }
+
+  /* Hide desktop tables; show mobile card lists */
+  .desktop-table { display: none !important; }
+  #absMineBody { display: none !important; }
+  .mobile-cards { display: flex !important; flex-direction: column; gap: 10px; }
+  .m-card {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .m-card-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .m-card-date { font-weight: 700; font-size: 14px; }
+  .m-card-hours { font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 15px; color: var(--saniga-red); }
+  .m-card-mid { font-size: 13px; color: var(--t2); }
+  .m-card-note { font-size: 12px; color: var(--t3); }
+  .m-card-acts { display: flex; gap: 8px; margin-top: 4px; width: 100%; }
+  .m-card-acts .entry-acts { width: 100%; }
+  .m-card-acts .btn { min-height: 44px; flex: 1; justify-content: center; }
+  #view-profil .btn { touch-action: manipulation; }
+  #view-profil input {
+    min-height: 48px; font-size: 16px; width: 100%;
+  }
+  #view-profil .card-title { font-size: 15px; font-weight: 700; color: var(--t1); }
+
+  #view-monat > div:first-child { flex-wrap: wrap; gap: 10px; }
+  #view-monat .btn { min-height: 48px; width: 100%; justify-content: center; }
+  #view-monat select {
+    min-height: 48px; width: 100%; font-size: 16px;
+  }
+  #view-absenzen > div:first-child .btn { min-height: 48px; width: 100%; justify-content: center; }
+  #view-absenzen select { min-height: 48px; font-size: 16px; }
+
+  /* Hours entry — true full-screen sheet (covers nav/FAB) */
+  body.entry-sheet-open {
+    overflow: hidden;
+  }
+  body.entry-sheet-open .mobile-bottom-nav,
+  body.entry-sheet-open .mobile-fab {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  #moEntry {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+    z-index: 220 !important;
+    overflow: hidden !important;
+  }
+  #moEntry .mo-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    transform: none !important;
+    background: #fff !important;
+  }
+  #moEntry.open .mo-box { transform: none !important; }
+  #moEntry .mo-sheet-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: #fff;
+  }
+  #moEntry .mo-sheet-head .mo-title {
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+  #moEntry .mo-sheet-head .mo-sub {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  #moEntry .mo-sheet-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #f3f7f9;
+    color: var(--t1);
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  #moEntry .mo-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  #moEntry .fg {
+    margin-bottom: 14px !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  #moEntry .fg label {
+    display: block;
+    margin-bottom: 6px;
+  }
+  /* Same control height for every field (text / number / date / select) */
+  #moEntry .fg input,
+  #moEntry .fg select {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: 52px;
+    min-height: 52px;
+    max-height: 52px;
+    margin: 0;
+    padding: 0 14px;
+    font-size: 16px;
+    line-height: 52px;
+    border-radius: 12px;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  #moEntry .fg select {
+    padding-right: 40px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%234a6570' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 18px;
+  }
+  /* Custom German date display; native picker sits on top (same height as other fields) */
+  #moEntry .date-field {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    height: 52px;
+    min-width: 0;
+  }
+  #moEntry .date-display {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    border: 1.5px solid var(--border-med);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--t1);
+    font-size: 16px;
+    font-family: inherit;
+    font-weight: 500;
+    pointer-events: none;
+    box-sizing: border-box;
+  }
+  #moEntry .date-display.is-empty { color: var(--t3); font-weight: 400; }
+  #moEntry .date-field input[type="date"] {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 52px !important;
+    min-height: 52px !important;
+    max-height: 52px !important;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    border: none;
+    background: transparent;
+    color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  #moEntry input[type="number"] {
+    -moz-appearance: textfield;
+  }
+  #moEntry input[type="number"]::-webkit-outer-spin-button,
+  #moEntry input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  #moEntry .mo-actions {
+    margin-top: 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border);
+    background: #fff;
+    flex-shrink: 0;
+    justify-content: stretch;
+    gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  #moEntry .mo-actions .btn {
+    flex: 1;
+    height: 52px;
+    min-height: 52px;
+    justify-content: center;
+    font-size: 15px;
+    border-radius: 12px;
+  }
+  /* Absenz sheet — same full-screen treatment as Stunden erfassen */
+  body.entry-sheet-open #moAbsence,
+  #moAbsence.open {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+    z-index: 220 !important;
+    overflow: hidden !important;
+  }
+  #moAbsence .mo-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    transform: none !important;
+    background: #fff !important;
+  }
+  #moAbsence.open .mo-box { transform: none !important; }
+  #moAbsence .mo-sheet-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: #fff;
+  }
+  #moAbsence .mo-sheet-head .mo-title { font-size: 20px; margin: 0 0 4px; }
+  #moAbsence .mo-sheet-head .mo-sub { margin: 0; font-size: 13px; line-height: 1.35; }
+  #moAbsence .mo-sheet-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #f3f7f9;
+    color: var(--t1);
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  #moAbsence .mo-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  #moAbsence .fg {
+    margin-bottom: 14px !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  #moAbsence .fg label { display: block; margin-bottom: 6px; }
+  #moAbsence .fg input:not([type="checkbox"]),
+  #moAbsence .fg select {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: 52px;
+    min-height: 52px;
+    max-height: 52px;
+    margin: 0;
+    padding: 0 14px;
+    font-size: 16px;
+    line-height: 52px;
+    border-radius: 12px;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  #moAbsence .fg select {
+    padding-right: 40px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%234a6570' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 18px;
+  }
+  #moAbsence .date-field {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    height: 52px;
+    min-width: 0;
+  }
+  #moAbsence .date-display {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    border: 1.5px solid var(--border-med);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--t1);
+    font-size: 16px;
+    font-family: inherit;
+    font-weight: 500;
+    pointer-events: none;
+    box-sizing: border-box;
+  }
+  #moAbsence .date-display.is-empty { color: var(--t3); font-weight: 400; }
+  #moAbsence .date-field input[type="date"] {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 52px !important;
+    min-height: 52px !important;
+    max-height: 52px !important;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    border: none;
+    background: transparent;
+    color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  #moAbsence .abs-halfday-label {
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    margin: 0 !important;
+    padding: 0 14px;
+    border: 1.5px solid var(--border-med);
+    border-radius: 12px;
+    background: var(--bg);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--t1);
+    cursor: pointer;
+  }
+  #moAbsence .abs-halfday-label input {
+    width: 22px !important;
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    accent-color: var(--saniga-red);
+    -webkit-appearance: checkbox !important;
+    appearance: auto !important;
+  }
+  #moAbsence .mo-actions {
+    margin-top: 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border);
+    background: #fff;
+    flex-shrink: 0;
+    justify-content: stretch;
+    gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  #moAbsence .mo-actions .btn {
+    flex: 1;
+    height: 52px;
+    min-height: 52px;
+    justify-content: center;
+    font-size: 15px;
+    border-radius: 12px;
+  }
+
+  .form-row { grid-template-columns: 1fr; }
+  .toast { left: 14px; right: 14px; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); max-width: none; }
+
+  #authGate { padding: 16px; align-items: flex-start; padding-top: 10vh; }
+  .auth-card { padding: 24px 18px; max-width: 100%; }
+  .auth-card input, .auth-card button { min-height: 48px; font-size: 16px; }
+  .auth-card .btn, #loginBtn { width: 100%; min-height: 48px; justify-content: center; }
+  .auth-card a {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 44px; padding: 10px 8px; font-size: 15px;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-bottom-nav, .mobile-fab, .mobile-cards, .topbar-user, .topbar-logo { display: none !important; }
+  .desktop-table { display: table; }
+  #absMineBody { display: block; }
+  .entry-card-line2, .entry-card-line3 { display: none; }
+  .ei.entry-card .entry-card-line1 { display: contents; }
+  .ec-body { display: none !important; }
+  .entry-acts-btns { display: none !important; }
+  .entry-acts-icons { display: flex !important; }
+}
+
 @media print {
   .sidebar, .topbar { display:none !important; }
   #mainApp { display:block !important; }
@@ -515,7 +1237,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <img src="/assets/logo-saniga.svg" alt="SANIGA AG" class="logo-img" width="220" height="40" decoding="async"/>
+    <img src="/assets/logo-saniga.svg?v=3" alt="Saniga" class="logo-img" width="168" height="40" decoding="async"/>
     <div class="logo-sub">Zeiterfassung</div>
   </div>
   <nav class="nav">
@@ -527,6 +1249,10 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     <div class="nav-item" onclick="showView('monat')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       Monatsübersicht
+    </div>
+    <div class="nav-item" onclick="showView('absenzen')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/></svg>
+      Absenzen
     </div>
     <!-- Payroll UI hidden: Lohn goes to external Treuhänder; restore if in-app payslips return.
     <div class="nav-item" onclick="showView('lohn')">
@@ -563,10 +1289,6 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Stundenexport
     </div>
-    <div class="nav-item admin-only-nav hidden" onclick="showView('absenzen')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/></svg>
-      Absenzen
-    </div>
   </nav>
   <div class="sidebar-bottom">
     <div class="user-pill">
@@ -583,6 +1305,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 <main class="main">
   <div class="topbar">
     <div class="topbar-title" id="topTitle">Meine Zeiten</div>
+    <div class="topbar-user" id="topUserName" aria-label="Angemeldet als"></div>
     <div class="topbar-actions">
       <div class="topbar-date" id="topDate"></div>
       <a href="/join.html" id="inviteLink" class="topbar-btn admin-only-nav hidden">Link für Mitarbeitende</a>
@@ -590,6 +1313,9 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         <select id="userSwitcher" onchange="switchUser(this.value)" aria-label="Mitarbeiter wählen"></select>
       </span>
       <button type="button" class="topbar-btn" id="logoutBtn">Abmelden</button>
+      <span class="topbar-logo" aria-label="Saniga">
+        <img src="/assets/logo-saniga.svg?v=3" alt="Saniga" width="128" height="30" decoding="async"/>
+      </span>
     </div>
   </div>
   <div class="content">
@@ -605,7 +1331,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         </div>
       </div>
       <div class="grid2">
-        <div class="card">
+        <div class="card meine-week-card">
           <div class="card-header">
             <div class="card-title">Diese Woche</div>
             <span class="badge bo" id="wkBadge">0h</span>
@@ -613,7 +1339,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           <div id="wkList" style="min-height:60px;"></div>
         </div>
         <div>
-          <div class="card mb20" style="padding:20px;">
+          <div class="card mb20 meine-progress" style="padding:20px;">
             <div class="stat-lbl" style="margin-bottom:8px;" id="mMonthLabel">— Fortschritt</div>
             <div style="font-size:36px;font-weight:800;line-height:1;" id="mHrs">0h</div>
             <div style="font-size:12px;color:var(--t3);margin-top:4px;margin-bottom:14px;" id="mSub">von 184h Soll</div>
@@ -646,10 +1372,11 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           <div class="card-title" id="monTitle">März 2026</div>
           <span class="badge bo" id="monBadge">0h</span>
         </div>
-        <table>
+        <table class="desktop-table">
           <thead><tr><th>Datum</th><th>Objekt</th><th>Arbeit</th><th>Stunden</th><th>Bemerkung</th><th></th></tr></thead>
           <tbody id="monBody"></tbody>
         </table>
+        <div class="mobile-cards" id="monCards" style="padding:12px;"></div>
       </div>
     </div>
 
@@ -911,20 +1638,33 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     <!-- ═══ ABSENZEN ═══ -->
     <div class="view" id="view-absenzen">
       <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:20px;">
-        <div class="fg">
-          <label for="absMonSel">Monat</label>
-          <select id="absMonSel" onchange="renderAbsenzen()" style="width:auto;min-width:180px;"></select>
-        </div>
+        <button type="button" class="btn btn-p" onclick="openAbsenceDialog()">Absenz erfassen</button>
       </div>
       <p style="font-size:13px;color:var(--t2);margin:0 0 14px;line-height:1.45;">
-        Übersicht der erfassten Absenzen (Ferien, Krankheit usw.) pro Mitarbeiter im gewählten Monat.
+        Ferien und andere Absenzen als Zeitraum erfassen. Samstage und Sonntage werden übersprungen.
       </p>
-      <div class="card">
+      <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
-          <div class="card-title" id="absTitle">Absenzen</div>
-          <span class="badge bo" id="absTotalBadge">0,0 h</span>
+          <div class="card-title">Meine Absenzen</div>
+          <span class="badge bo" id="absMineCount">0</span>
         </div>
-        <div id="absBody"><div class="rp-empty" style="box-shadow:none;border:none;">Monat wählen…</div></div>
+        <div id="absMineBody"><div class="rp-empty" style="box-shadow:none;border:none;">Lade…</div></div>
+        <div class="mobile-cards" id="absMineCards" style="padding:12px;"></div>
+      </div>
+      <div class="admin-only-nav hidden" id="absTeamSection">
+        <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:14px;">
+          <div class="fg">
+            <label for="absMonSel">Team · Monat</label>
+            <select id="absMonSel" onchange="renderAbsenzenTeam()" style="width:auto;min-width:180px;"></select>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title" id="absTitle">Team-Übersicht</div>
+            <span class="badge bo" id="absTotalBadge">0,0 h</span>
+          </div>
+          <div id="absBody"><div class="rp-empty" style="box-shadow:none;border:none;">Monat wählen…</div></div>
+        </div>
       </div>
     </div>
 
@@ -1108,52 +1848,140 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       <div id="invBody"></div>
     </div>
 
+    <!-- ═══ PROFIL (mobile employee) ═══ -->
+    <div class="view" id="view-profil">
+      <div class="card" style="padding:22px 18px;margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+          <div class="emp-av" id="pAv" style="width:56px;height:56px;font-size:18px;">—</div>
+          <div style="min-width:0;">
+            <div id="pName" style="font-size:18px;font-weight:800;color:var(--t1);line-height:1.2;">—</div>
+            <div id="pRole" style="font-size:13px;color:var(--t2);margin-top:4px;">—</div>
+          </div>
+        </div>
+        <div class="fg" style="margin-bottom:14px;">
+          <label>E-Mail (Login)</label>
+          <div id="pEmail" style="font-size:15px;font-weight:600;color:var(--t1);padding:10px 0 0;">—</div>
+          <p style="font-size:12px;color:var(--t3);margin:6px 0 0;">Die E-Mail kann nur die Geschäftsleitung ändern.</p>
+        </div>
+      </div>
+
+      <div class="card" style="padding:22px 18px;margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:14px;">Konto anpassen</div>
+        <div class="fg" style="margin-bottom:12px;">
+          <label for="pFirstName">Vorname</label>
+          <input type="text" id="pFirstName" autocomplete="given-name" maxlength="80">
+        </div>
+        <div class="fg" style="margin-bottom:12px;">
+          <label for="pLastName">Nachname</label>
+          <input type="text" id="pLastName" autocomplete="family-name" maxlength="80">
+        </div>
+        <div class="fg" style="margin-bottom:12px;">
+          <label for="pCurrentPassword">Aktuelles Passwort</label>
+          <input type="password" id="pCurrentPassword" autocomplete="current-password" placeholder="Nur bei Passwortwechsel">
+        </div>
+        <div class="fg" style="margin-bottom:12px;">
+          <label for="pNewPassword">Neues Passwort</label>
+          <input type="password" id="pNewPassword" autocomplete="new-password" placeholder="Mindestens 8 Zeichen">
+        </div>
+        <div class="fg" style="margin-bottom:14px;">
+          <label for="pNewPassword2">Neues Passwort wiederholen</label>
+          <input type="password" id="pNewPassword2" autocomplete="new-password" placeholder="Wiederholen">
+        </div>
+        <p id="pProfileErr" style="color:var(--red);font-size:13px;margin:0 0 12px;display:none;"></p>
+        <button type="button" class="btn btn-p" id="pSaveBtn" style="width:100%;justify-content:center;min-height:48px;" onclick="saveProfilSettings()">Änderungen speichern</button>
+      </div>
+
+      <div class="card" style="padding:22px 18px;margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:10px;">Stammdaten</div>
+        <div id="pSyncStatus" style="font-size:13px;color:var(--t2);margin:0 0 12px;line-height:1.4;">—</div>
+        <button type="button" class="btn btn-g" id="pSyncBtn" style="width:100%;justify-content:center;min-height:48px;" onclick="refreshProfilMasterData()">Jetzt synchronisieren</button>
+        <p style="font-size:12px;color:var(--t3);line-height:1.45;margin:12px 0 0;">
+          Objekte und Arbeitsarten werden im Hintergrund aktualisiert.
+        </p>
+      </div>
+
+      <button type="button" class="btn btn-d" id="profilLogoutBtn" style="width:100%;justify-content:center;min-height:48px;margin-bottom:8px;">Abmelden</button>
+    </div>
+
   </div>
 </main>
+
+<nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Hauptnavigation">
+  <button type="button" class="mbnav-item active" data-view="meine">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Zeiten
+  </button>
+  <button type="button" class="mbnav-item" data-view="monat">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h4"/></svg>
+    Monat
+  </button>
+  <button type="button" class="mbnav-item" data-view="absenzen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Absenzen
+  </button>
+  <button type="button" class="mbnav-item" data-view="profil">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    Profil
+  </button>
+</nav>
+<button type="button" class="mobile-fab" id="mobileFab" onclick="openAdd()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  Stunden erfassen
+</button>
 </div>
 
 <!-- MODAL: EINTRAG -->
 <div class="mo" id="moEntry">
   <div class="mo-box">
-    <div class="mo-title" id="mEntryTitle">Stunden erfassen</div>
-    <div class="mo-sub" id="mEntrySub">Du kannst Einträge für jeden beliebigen Tag hinzufügen — auch nachträglich.</div>
-    <div class="fg" style="margin-bottom:14px;" id="eEmpFg">
-      <label>Mitarbeiter</label>
-      <select id="eEmp"></select>
-    </div>
-    <div class="fg" style="margin-bottom:14px;" id="eDateFg">
-      <label>Datum</label>
-      <input type="date" id="eDate">
-    </div>
-    <div class="fg" style="margin-bottom:14px;">
-      <label>Arbeit / Absenz</label>
-      <select id="eWorkType" onchange="onEntryWorkTypeChange()"></select>
-    </div>
-    <div class="fg" style="margin-bottom:14px;" id="eSiteFg">
-      <label>Objekt</label>
-      <select id="eSite"></select>
-    </div>
-    <div class="fg" style="margin-bottom:14px;">
-      <label id="eHoursLabel">Stunden</label>
-      <input type="number" id="eHours" min="0.5" max="16" step="0.5" value="8">
-    </div>
-    <div class="fg" style="margin-bottom:14px;">
-      <label>Bemerkung (optional)</label>
-      <input type="text" id="eNote" placeholder="z.B. Material geliefert">
-    </div>
-    <p id="eEntryErr" style="color:var(--red);font-size:13px;margin:0 0 12px;display:none;"></p>
-    <div class="form-row3 legacy-time-fields" style="margin-bottom:14px;">
-      <div class="fg"><label>Von</label><input type="time" id="eFrom" value="07:00"></div>
-      <div class="fg"><label>Bis</label><input type="time" id="eTo"   value="16:30"></div>
-      <div class="fg"><label>Pause (Min.)</label><input type="number" id="eBrk" value="30" min="0" max="120"></div>
-    </div>
-    <div class="legacy-time-fields" style="background:rgba(18,184,225,.06);border:1px solid rgba(18,184,225,.14);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:16px;">
-      <div>
-        <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">Nettoarbeitszeit</div>
-        <div style="font-size:24px;font-weight:800;color:var(--saniga-red);margin-top:2px;" id="eCalc">—</div>
+    <div class="mo-sheet-head">
+      <div style="min-width:0;flex:1;">
+        <div class="mo-title" id="mEntryTitle">Stunden erfassen</div>
+        <div class="mo-sub" id="mEntrySub">Eintrag für heute oder nachträglich erfassen.</div>
       </div>
-      <div style="width:1px;height:40px;background:var(--border);"></div>
-      <div style="font-size:12px;color:var(--t2);">Brutto – Pause = Nettozeit.<br>Diese wird für den Lohn berechnet.</div>
+      <button type="button" class="mo-sheet-close" onclick="closeM('moEntry')" aria-label="Schliessen">×</button>
+    </div>
+    <div class="mo-scroll">
+      <div class="fg" style="margin-bottom:14px;" id="eEmpFg">
+        <label>Mitarbeiter</label>
+        <select id="eEmp"></select>
+      </div>
+      <div class="fg" style="margin-bottom:14px;" id="eDateFg">
+        <label for="eDate">Datum</label>
+        <div class="date-field">
+          <input type="date" id="eDate" lang="de-CH" autocomplete="off">
+          <span class="date-display" id="eDateDisplay" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Arbeitsart</label>
+        <select id="eWorkType" onchange="onEntryWorkTypeChange()"></select>
+      </div>
+      <div class="fg" style="margin-bottom:14px;" id="eSiteFg">
+        <label>Objekt *</label>
+        <select id="eSite"></select>
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label id="eHoursLabel">Stunden</label>
+        <input type="number" id="eHours" min="0.5" max="16" step="0.5" value="8" inputmode="decimal">
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Bemerkung (optional)</label>
+        <input type="text" id="eNote" placeholder="z.B. Material geliefert">
+      </div>
+      <p id="eEntryErr" style="color:var(--red);font-size:13px;margin:0 0 12px;display:none;"></p>
+      <div class="form-row3 legacy-time-fields" style="margin-bottom:14px;">
+        <div class="fg"><label>Von</label><input type="time" id="eFrom" value="07:00"></div>
+        <div class="fg"><label>Bis</label><input type="time" id="eTo"   value="16:30"></div>
+        <div class="fg"><label>Pause (Min.)</label><input type="number" id="eBrk" value="30" min="0" max="120"></div>
+      </div>
+      <div class="legacy-time-fields" style="background:rgba(18,184,225,.06);border:1px solid rgba(18,184,225,.14);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:16px;">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;">Nettoarbeitszeit</div>
+          <div style="font-size:24px;font-weight:800;color:var(--saniga-red);margin-top:2px;" id="eCalc">—</div>
+        </div>
+        <div style="width:1px;height:40px;background:var(--border);"></div>
+        <div style="font-size:12px;color:var(--t2);">Brutto – Pause = Nettozeit.<br>Diese wird für den Lohn berechnet.</div>
+      </div>
     </div>
     <div class="mo-actions">
       <button class="btn btn-d" id="eDel" onclick="deleteEntry()" style="margin-right:auto;display:none;">Löschen</button>
@@ -1237,6 +2065,58 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     <div class="mo-actions">
       <button class="btn btn-g" onclick="closeM('moEditEmp')">Abbrechen</button>
       <button class="btn btn-p" onclick="saveEditEmp()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ABSENZ ERFASSEN -->
+<div class="mo" id="moAbsence">
+  <div class="mo-box">
+    <div class="mo-sheet-head">
+      <div style="min-width:0;flex:1;">
+        <div class="mo-title">Absenz erfassen</div>
+        <div class="mo-sub">Werktage (Mo–Fr) im Zeitraum. Wochenenden entfallen.</div>
+      </div>
+      <button type="button" class="mo-sheet-close" onclick="closeM('moAbsence')" aria-label="Schliessen">×</button>
+    </div>
+    <div class="mo-scroll">
+      <div class="fg" style="margin-bottom:14px;" id="absEmpFg">
+        <label for="absEmp">Mitarbeiter</label>
+        <select id="absEmp"></select>
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label for="absType">Art</label>
+        <select id="absType"></select>
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label for="absFrom">Von</label>
+        <div class="date-field">
+          <input type="date" id="absFrom" lang="de-CH" autocomplete="off">
+          <span class="date-display" id="absFromDisplay" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label for="absTo">Bis</label>
+        <div class="date-field">
+          <input type="date" id="absTo" lang="de-CH" autocomplete="off">
+          <span class="date-display" id="absToDisplay" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="fg abs-halfday" style="margin-bottom:14px;">
+        <label class="abs-halfday-label" for="absHalfDay">
+          <input type="checkbox" id="absHalfDay">
+          <span>Halbtag (halbe Tagesstunden)</span>
+        </label>
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label for="absNote">Bemerkung (optional)</label>
+        <input type="text" id="absNote" placeholder="z.B. Familienferien" maxlength="500">
+      </div>
+      <p id="absErr" style="color:var(--red);font-size:13px;margin:0 0 12px;display:none;"></p>
+    </div>
+    <div class="mo-actions">
+      <button type="button" class="btn btn-g" onclick="closeM('moAbsence')">Abbrechen</button>
+      <button type="button" class="btn btn-p" onclick="saveAbsence()">Speichern</button>
     </div>
   </div>
 </div>

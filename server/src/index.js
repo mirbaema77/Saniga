@@ -22,6 +22,7 @@ const ratesRoutes = require('./routes/rates');
 const companyRoutes = require('./routes/company');
 const exportsRoutes = require('./routes/exports');
 const dashboardRoutes = require('./routes/dashboard');
+const absencesRoutes = require('./routes/absences');
 
 const app = express();
 const PORT = Number(process.env.PORT, 10) || 3000;
@@ -83,6 +84,7 @@ app.use('/api/rates', ratesRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/exports', exportsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/absences', absencesRoutes);
 
 app.use(
   express.static(publicDir, {

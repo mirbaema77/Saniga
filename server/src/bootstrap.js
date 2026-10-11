@@ -2,6 +2,7 @@ const { prisma } = require('./lib/prisma');
 const { hashPassword } = require('./lib/password');
 const { ensureCompany } = require('./lib/company');
 const { ensureAbsenceWorkTypes } = require('./lib/absenceWorkTypes');
+const { ensureSwissHolidays } = require('./lib/ensureSwissHolidays');
 
 async function ensureAdmin() {
   const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
@@ -40,6 +41,18 @@ async function bootstrap() {
   if (abs.created.length) {
     console.log(`[bootstrap] Absenz-Arbeitsarten angelegt: ${abs.created.join(', ')}`);
   }
+  const hol = await ensureSwissHolidays(prisma);
+  if (hol.created) {
+    console.log(
+      `[bootstrap] ZH-Feiertage angelegt: ${hol.created} Einträge (${hol.years.join(', ')})`
+    );
+  }
 }
 
-module.exports = { ensureAdmin, ensureCompany, bootstrap, ensureAbsenceWorkTypes };
+module.exports = {
+  ensureAdmin,
+  ensureCompany,
+  bootstrap,
+  ensureAbsenceWorkTypes,
+  ensureSwissHolidays,
+};

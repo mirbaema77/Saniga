@@ -2,8 +2,13 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#12B8E1"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="Saniga"/>
 <title>Registrieren – Saniga Zeiterfassung</title>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="/assets/logo-saniga.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
 <style>
 :root {
@@ -46,6 +51,18 @@ input[readonly] { background: #f3f7f9; color: var(--t2); }
 .back { text-align: center; margin-top: 18px; }
 .back a { color: var(--saniga-red); font-weight: 600; text-decoration: none; font-size: 13px; }
 .hidden { display: none !important; }
+@media (max-width: 767px) {
+  body { padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); overflow-x: hidden; max-width: 100vw; }
+  .wrap { padding-top: 4vh; max-width: 100%; }
+  .card { padding: 22px 18px; }
+  input, .btn { min-height: 48px; font-size: 16px; }
+  .btn { width: 100%; }
+  .row2 { grid-template-columns: 1fr; }
+  a {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 44px; padding: 10px 8px; font-size: 15px;
+  }
+}
 </style>
 </head>
 <body>

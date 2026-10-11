@@ -24,8 +24,10 @@ let lastReportsData = null;
 let pendingEntrySave = null;
 let entrySyncTimer = null;
 let entriesFingerprint = '';
+let masterFingerprint = '';
 let suppressRemoteToastUntil = 0;
 let syncInFlight = false;
+const ENTRY_SYNC_MS = 30000;
 
 const MOS = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
@@ -106,6 +108,7 @@ function mapEntry(e) {
     invoiceNumber: e.invoiceNumber || null,
     billable: e.billable !== false,
     workTypeLabel: e.workTypeLabel || null,
+    absenceGroupId: e.absenceGroupId || null,
   };
 }
 
@@ -118,9 +121,84 @@ function fingerprintEntries(list) {
     .join('|');
 }
 
+function fingerprintMaster(customers, sites, workTypes) {
+  const c = (customers || [])
+    .map((x) => `${x.id}:${x.name}:${x.paymentTermDays ?? ''}`)
+    .sort()
+    .join('|');
+  const s = (sites || [])
+    .map(
+      (x) =>
+        `${x.id}:${x.customerId || ''}:${x.label}:${x.active !== false ? 1 : 0}:${x.objectNumber || ''}`
+    )
+    .sort()
+    .join('|');
+  const w = (workTypes || [])
+    .map(
+      (x) =>
+        `${x.id}:${x.label}:${x.active !== false ? 1 : 0}:${x.billable !== false ? 1 : 0}`
+    )
+    .sort()
+    .join('|');
+  return `${c}#${s}#${w}`;
+}
+
 function markLocalEntriesState() {
   entriesFingerprint = fingerprintEntries(ENTRIES);
+  masterFingerprint = fingerprintMaster(CUSTOMERS, SITES, WORK_TYPES);
   suppressRemoteToastUntil = Date.now() + 8000;
+}
+
+/** Fetch customers, sites, work types into memory. Returns true if data changed. */
+async function fetchMasterData() {
+  const [cRes, sRes, wRes] = await Promise.all([
+    api('/customers'),
+    api('/sites'),
+    api('/work-types'),
+  ]);
+  const nextC = cRes.customers || [];
+  const nextS = sRes.sites || [];
+  const nextW = wRes.workTypes || [];
+  const fp = fingerprintMaster(nextC, nextS, nextW);
+  const changed = fp !== masterFingerprint;
+  CUSTOMERS = nextC;
+  SITES = nextS;
+  WORK_TYPES = nextW;
+  masterFingerprint = fp;
+  return changed;
+}
+
+/**
+ * Re-apply master data to the active view without wiping half-edited Stammdaten forms.
+ */
+function applyMasterDataRefresh() {
+  const view = document.querySelector('.view.active');
+  const n = view ? view.id.replace('view-', '') : '';
+  if (n === 'alle') {
+    fillAlleSel();
+    renderAlleTable();
+    return;
+  }
+  if (n === 'rapporte') {
+    fillReportFilterSelects();
+    syncReportFilterUi();
+    updateReportFilterSummary();
+    return;
+  }
+  if (n === 'absenzen') {
+    renderAbsenzen();
+  }
+  if (n === 'profil') {
+    renderProfil();
+  }
+  if (n === 'stammdaten' && IS_ADMIN) {
+    const editing = document.querySelector(
+      '#view-stammdaten input:focus, #view-stammdaten select:focus, #view-stammdaten textarea:focus'
+    );
+    if (!editing) {
+      showStammdatenTab(sdTab || 'kunden');
+    }
+  }
 }
 
 function notifyEntrySync(prev, next) {
@@ -152,33 +230,45 @@ function notifyEntrySync(prev, next) {
 
 async function pollRemoteEntries() {
   if (!ME || syncInFlight) return;
+  // Skip while a modal is open so half-filled forms / dropdowns are not rebuilt mid-edit.
   if (document.querySelector('.mo.open')) return;
   syncInFlight = true;
   try {
+    let masterChanged = false;
+    try {
+      masterChanged = await fetchMasterData();
+    } catch {
+      /* keep cached master data */
+    }
+
     const entRes = await api('/time-entries?from=2020-01-01&to=2030-12-31');
     const next = entRes.entries.map(mapEntry);
     const fp = fingerprintEntries(next);
-    if (fp === entriesFingerprint) return;
+    const entriesChanged = fp !== entriesFingerprint;
 
-    const prev = ENTRIES.slice();
-    const hadState = Boolean(entriesFingerprint);
-    ENTRIES = next;
+    if (entriesChanged) {
+      const prev = ENTRIES.slice();
+      const hadState = Boolean(entriesFingerprint);
+      ENTRIES = next;
 
-    if (IS_ADMIN) {
-      try {
-        const emRes = await api('/employees');
-        EMPS = emRes.employees.map(mapEmp);
-        ensureSelfInEmps();
-        fillUserSwitcher();
-      } catch {
-        /* keep existing EMPS */
+      if (IS_ADMIN) {
+        try {
+          const emRes = await api('/employees');
+          EMPS = emRes.employees.map(mapEmp);
+          ensureSelfInEmps();
+          fillUserSwitcher();
+        } catch {
+          /* keep existing EMPS */
+        }
       }
-    }
 
-    const allowToast = hadState && Date.now() >= suppressRemoteToastUntil;
-    entriesFingerprint = fp;
-    if (allowToast) notifyEntrySync(prev, next);
-    refreshCur();
+      const allowToast = hadState && Date.now() >= suppressRemoteToastUntil;
+      entriesFingerprint = fp;
+      if (allowToast) notifyEntrySync(prev, next);
+      refreshCur();
+    } else if (masterChanged) {
+      applyMasterDataRefresh();
+    }
   } catch {
     /* ignore transient network errors */
   } finally {
@@ -189,7 +279,7 @@ async function pollRemoteEntries() {
 function startEntrySync() {
   stopEntrySync();
   markLocalEntriesState();
-  entrySyncTimer = setInterval(pollRemoteEntries, 4000);
+  entrySyncTimer = setInterval(pollRemoteEntries, ENTRY_SYNC_MS);
 }
 
 function stopEntrySync() {
@@ -210,9 +300,7 @@ async function loadData() {
     EMPS = [mapEmp(ME)];
   }
   try {
-    const [sRes, wRes] = await Promise.all([api('/sites'), api('/work-types')]);
-    SITES = sRes.sites || [];
-    WORK_TYPES = wRes.workTypes || [];
+    await fetchMasterData();
   } catch {
     /* dropdowns filled when opening the form */
   }
@@ -287,11 +375,26 @@ function net(en) {
   return en.to - en.from - en.brk;
 }
 
-function entrySiteLabel(en) {
+function entrySiteParts(en) {
   const site = SITES.find((s) => s.id === en.siteId);
-  if (!site) return '';
-  const cust = site.customer?.name || CUSTOMERS.find((c) => c.id === site.customerId)?.name || '';
-  return cust ? `${cust} — ${site.label}` : site.label;
+  if (!site) return { customer: '', site: '' };
+  const customer =
+    site.customer?.name || CUSTOMERS.find((c) => c.id === site.customerId)?.name || '';
+  return { customer, site: site.label || '' };
+}
+
+function entrySiteLabel(en) {
+  const parts = entrySiteParts(en);
+  if (!parts.site && !parts.customer) return '';
+  return parts.customer ? `${parts.customer} — ${parts.site}` : parts.site;
+}
+
+function fmtDShort(s) {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return fmtD(s);
+  const [y, mo, d] = s.split('-').map(Number);
+  const weekday = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0)).getUTCDay();
+  const ns = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  return `${ns[weekday]}, ${String(d).padStart(2, '0')}.${String(mo).padStart(2, '0')}.`;
 }
 
 function entryWorkLabel(en) {
@@ -333,22 +436,34 @@ function entryStatusLabel(en) {
 function entryActionButtonsHtml(en) {
   if (isEntryInvoiced(en)) {
     const tip = escapeAttr(`Verrechnet auf Rechnung ${en.invoiceNumber}`);
-    return `<div style="display:flex;gap:6px;">
-      <div class="ib disabled" title="${tip}" aria-disabled="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    return `<div class="entry-acts">
+      <div class="entry-acts-icons" title="${tip}">
+        <div class="ib disabled" aria-disabled="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <div class="ib del disabled" aria-disabled="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </div>
       </div>
-      <div class="ib del disabled" title="${tip}" aria-disabled="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      <div class="entry-acts-btns">
+        <button type="button" class="btn btn-g" disabled title="${tip}">Bearbeiten</button>
+        <button type="button" class="btn btn-d" disabled title="${tip}">Löschen</button>
       </div>
     </div>`;
   }
   const id = escapeAttr(en.id);
-  return `<div style="display:flex;gap:6px;">
-    <div class="ib" onclick="openEdit('${id}')" title="Bearbeiten">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+  return `<div class="entry-acts">
+    <div class="entry-acts-icons">
+      <button type="button" class="ib" onclick="openEdit('${id}')" title="Bearbeiten" aria-label="Bearbeiten">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      <button type="button" class="ib del" onclick="quickDel('${id}')" title="Löschen" aria-label="Löschen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </button>
     </div>
-    <div class="ib del" onclick="quickDel('${id}')" title="Löschen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+    <div class="entry-acts-btns">
+      <button type="button" class="btn btn-g" onclick="openEdit('${id}')">Bearbeiten</button>
+      <button type="button" class="btn btn-d" onclick="quickDel('${id}')">Löschen</button>
     </div>
   </div>`;
 }
@@ -414,13 +529,19 @@ function kw(s) {
 /** Sidebar always shows the logged-in account (admin stays admin even when viewing an employee). */
 function syncSidebarFromCur() {
   if (!ME) return;
+  const fullName = `${ME.firstName} ${ME.lastName}`;
+  const roleLbl = ME.jobTitle || (ME.role === 'ADMIN' ? 'Admin' : 'Mitarbeiter');
   const av = document.getElementById('sAv');
   const name = document.getElementById('sName');
   const role = document.getElementById('sRole');
-  av.textContent = (ME.firstName[0] + ME.lastName[0]).toUpperCase();
-  av.style.background = ME.avatarColor || '#12B8E1';
-  name.textContent = `${ME.firstName} ${ME.lastName}`;
-  role.textContent = ME.jobTitle || (ME.role === 'ADMIN' ? 'Admin' : 'Mitarbeiter');
+  if (av) {
+    av.textContent = (ME.firstName[0] + ME.lastName[0]).toUpperCase();
+    av.style.background = ME.avatarColor || '#12B8E1';
+  }
+  if (name) name.textContent = fullName;
+  if (role) role.textContent = roleLbl;
+  const topName = document.getElementById('topUserName');
+  if (topName) topName.textContent = fullName;
 }
 
 function switchUser(id) {
@@ -452,18 +573,84 @@ const TITLES = {
   rechnungen: 'Rechnungen',
   stundenexport: 'Stundenexport',
   absenzen: 'Absenzen',
+  profil: 'Profil',
 };
 
+let activeViewName = '';
+
+function syncMobileChrome(n) {
+  document.querySelectorAll('.mbnav-item').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-view') === n);
+  });
+  const fab = document.getElementById('mobileFab');
+  if (fab) {
+    const showFab = n === 'meine';
+    fab.classList.toggle('show', showFab);
+    fab.setAttribute('aria-hidden', showFab ? 'false' : 'true');
+    fab.tabIndex = showFab ? 0 : -1;
+  }
+  document.body.classList.toggle('mobile-meine-open', n === 'meine');
+}
+
 function showView(n) {
+  if (!n) return;
+  // Same tab: only refresh chrome, don't re-fetch (avoids “dead” taps while sync runs).
+  if (n === activeViewName) {
+    syncMobileChrome(n);
+    return;
+  }
+  activeViewName = n;
   document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
   const el = document.getElementById(`view-${n}`);
   if (el) el.classList.add('active');
   document.querySelectorAll('.nav-item').forEach((i) => {
     i.classList.toggle('active', i.getAttribute('onclick') === `showView('${n}')`);
   });
-  document.getElementById('topTitle').textContent = TITLES[n] || '';
-  refreshView(n);
-  if (ME) pollRemoteEntries();
+  const titleEl = document.getElementById('topTitle');
+  if (titleEl) titleEl.textContent = TITLES[n] || '';
+  syncMobileChrome(n);
+  if (n === 'profil') renderProfil();
+  else refreshView(n);
+}
+
+/** Instant bottom-nav response on iPhone (pointerdown, no click delay / swallowed first tap). */
+function bindMobileBottomNav() {
+  const nav = document.getElementById('mobileBottomNav');
+  if (!nav || nav.dataset.bound === '1') return;
+  nav.dataset.bound = '1';
+  let armed = null;
+
+  nav.addEventListener(
+    'pointerdown',
+    (e) => {
+      const btn = e.target.closest('.mbnav-item');
+      if (!btn || !nav.contains(btn)) return;
+      armed = btn;
+      btn.classList.add('is-pressed');
+      const view = btn.getAttribute('data-view');
+      if (view) showView(view);
+      // Stop the delayed click that iOS fires afterwards (felt like “tap does nothing”).
+      e.preventDefault();
+    },
+    { passive: false }
+  );
+
+  const clearPressed = () => {
+    armed = null;
+    nav.querySelectorAll('.is-pressed').forEach((b) => b.classList.remove('is-pressed'));
+  };
+  nav.addEventListener('pointerup', clearPressed);
+  nav.addEventListener('pointercancel', clearPressed);
+  nav.addEventListener('pointerleave', clearPressed);
+
+  // Keyboard / desktop fallback when pointerdown was not used
+  nav.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mbnav-item');
+    if (!btn || !nav.contains(btn)) return;
+    e.preventDefault();
+    const view = btn.getAttribute('data-view');
+    if (view) showView(view);
+  });
 }
 
 function refreshCur() {
@@ -474,6 +661,7 @@ function refreshCur() {
 function refreshView(n) {
   if (n === 'meine') renderMeine();
   if (n === 'monat') renderMonat();
+  if (n === 'profil') renderProfil();
   if (n === 'dashboard' && IS_ADMIN) renderDash();
   if (n === 'team' && IS_ADMIN) renderTeam();
   // Payroll view hidden (Treuhänder). Uncomment with nav/view to restore.
@@ -488,7 +676,7 @@ function refreshView(n) {
   if (n === 'stundenexport' && IS_ADMIN) {
     loadHoursExport();
   }
-  if (n === 'absenzen' && IS_ADMIN) {
+  if (n === 'absenzen') {
     renderAbsenzen();
   }
   if (n === 'alle' && IS_ADMIN) {
@@ -503,6 +691,130 @@ function refreshView(n) {
   }
   if (n === 'rechnungen' && IS_ADMIN) {
     loadInvoices();
+  }
+}
+
+function showProfilErr(msg) {
+  const el = document.getElementById('pProfileErr');
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.style.display = 'block';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
+  }
+}
+
+function renderProfil() {
+  if (!ME) return;
+  const av = document.getElementById('pAv');
+  const name = document.getElementById('pName');
+  const role = document.getElementById('pRole');
+  const email = document.getElementById('pEmail');
+  const sync = document.getElementById('pSyncStatus');
+  const first = document.getElementById('pFirstName');
+  const last = document.getElementById('pLastName');
+  if (av) {
+    av.textContent = `${(ME.firstName || '?')[0]}${(ME.lastName || '?')[0]}`.toUpperCase();
+    av.style.background = ME.avatarColor || '#12B8E1';
+  }
+  if (name) name.textContent = `${ME.firstName} ${ME.lastName}`;
+  if (role) role.textContent = ME.jobTitle || (ME.role === 'ADMIN' ? 'Admin' : 'Mitarbeiter');
+  if (email) email.textContent = ME.email || '—';
+  if (first && document.activeElement !== first) first.value = ME.firstName || '';
+  if (last && document.activeElement !== last) last.value = ME.lastName || '';
+  if (sync) {
+    const sites = SITES.filter((s) => s.active !== false).length;
+    const types = WORK_TYPES.filter((w) => w.active !== false).length;
+    sync.textContent = `${sites} Objekte · ${types} Arbeitsarten geladen`;
+  }
+  showProfilErr('');
+}
+
+async function saveProfilSettings() {
+  if (!ME) return;
+  showProfilErr('');
+  const firstName = (document.getElementById('pFirstName')?.value || '').trim();
+  const lastName = (document.getElementById('pLastName')?.value || '').trim();
+  const currentPassword = document.getElementById('pCurrentPassword')?.value || '';
+  const newPassword = document.getElementById('pNewPassword')?.value || '';
+  const newPassword2 = document.getElementById('pNewPassword2')?.value || '';
+  if (!firstName || !lastName) {
+    showProfilErr('Vor- und Nachname sind erforderlich.');
+    return;
+  }
+  if (newPassword || newPassword2 || currentPassword) {
+    if (newPassword.length < 8) {
+      showProfilErr('Neues Passwort mindestens 8 Zeichen.');
+      return;
+    }
+    if (newPassword !== newPassword2) {
+      showProfilErr('Die neuen Passwörter stimmen nicht überein.');
+      return;
+    }
+    if (!currentPassword) {
+      showProfilErr('Aktuelles Passwort eingeben, um das Passwort zu ändern.');
+      return;
+    }
+  }
+  const body = { firstName, lastName };
+  if (newPassword) {
+    body.currentPassword = currentPassword;
+    body.newPassword = newPassword;
+  }
+  const btn = document.getElementById('pSaveBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Speichern…';
+  }
+  try {
+    const res = await api('/auth/me', { method: 'PATCH', body: JSON.stringify(body) });
+    ME = res.user;
+    syncSidebarFromCur();
+    if (document.getElementById('pCurrentPassword')) document.getElementById('pCurrentPassword').value = '';
+    if (document.getElementById('pNewPassword')) document.getElementById('pNewPassword').value = '';
+    if (document.getElementById('pNewPassword2')) document.getElementById('pNewPassword2').value = '';
+    renderProfil();
+    toast(newPassword ? 'Profil und Passwort gespeichert' : 'Profil gespeichert');
+  } catch (e) {
+    showProfilErr(e.message || 'Speichern fehlgeschlagen');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Änderungen speichern';
+    }
+  }
+}
+
+function doLogout() {
+  stopEntrySync();
+  localStorage.removeItem(TOKEN_KEY);
+  window.location.reload();
+}
+
+async function refreshProfilMasterData() {
+  const btn = document.getElementById('pSyncBtn');
+  const sync = document.getElementById('pSyncStatus');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Aktualisiere…';
+  }
+  try {
+    await ensureEntryMasterData();
+    await loadData();
+    renderProfil();
+    if (sync) {
+      sync.textContent = `${SITES.filter((s) => s.active !== false).length} Objekte · ${WORK_TYPES.filter((w) => w.active !== false).length} Arbeitsarten · gerade aktualisiert`;
+    }
+    toast('Stammdaten synchronisiert');
+  } catch (e) {
+    toast(e.message || 'Synchronisation fehlgeschlagen');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Jetzt synchronisieren';
+    }
   }
 }
 
@@ -522,20 +834,25 @@ function fillReportFilterSelects() {
   const custSel = document.getElementById('rpCustomer');
   const wtSel = document.getElementById('rpWorkType');
   if (custSel) {
-    const prev = reportCustomerId;
+    const prev = reportCustomerId || custSel.value || '';
     custSel.innerHTML =
       `<option value="">Alle</option>` +
       CUSTOMERS.map((c) => `<option value="${escapeAttr(c.id)}">${escapeAttr(c.name)}</option>`).join('');
-    custSel.value = prev || '';
+    if (prev) custSel.value = prev;
     reportCustomerId = custSel.value;
   }
   if (wtSel) {
-    const prev = reportWorkTypeId;
+    const prev = reportWorkTypeId || wtSel.value || '';
     const types = WORK_TYPES.filter((w) => w.active !== false);
-    wtSel.innerHTML =
+    const selected = prev ? WORK_TYPES.find((w) => w.id === prev) : null;
+    let html =
       `<option value="">Alle</option>` +
       types.map((w) => `<option value="${escapeAttr(w.id)}">${escapeAttr(w.label)}</option>`).join('');
-    wtSel.value = prev || '';
+    if (selected && selected.active === false) {
+      html += `<option value="${escapeAttr(selected.id)}">${escapeAttr(selected.label)} (inaktiv)</option>`;
+    }
+    wtSel.innerHTML = html;
+    if (prev) wtSel.value = prev;
     reportWorkTypeId = wtSel.value;
   }
 }
@@ -626,13 +943,8 @@ function billableOpenEntries(entries) {
 }
 
 async function ensureReportFilterData() {
-  const needsCust = !CUSTOMERS.length;
-  const needsWt = !WORK_TYPES.length;
-  if (!needsCust && !needsWt) return;
-  const jobs = [];
-  if (needsCust) jobs.push(api('/customers').then((r) => { CUSTOMERS = r.customers || []; }));
-  if (needsWt) jobs.push(api('/work-types').then((r) => { WORK_TYPES = r.workTypes || []; }));
-  await Promise.all(jobs);
+  if (CUSTOMERS.length && WORK_TYPES.length) return;
+  await fetchMasterData();
 }
 
 async function loadReports() {
@@ -752,7 +1064,90 @@ async function downloadHoursExportCsv() {
   }
 }
 
+const ABSENCE_TYPE_ORDER = ['Ferien', 'Krankheit', 'Unfall', 'Feiertag', 'Militär'];
+
+function absenceTypesSorted() {
+  return WORK_TYPES.filter((w) => w.active !== false && w.billable === false).sort((a, b) => {
+    const ia = ABSENCE_TYPE_ORDER.indexOf(a.label);
+    const ib = ABSENCE_TYPE_ORDER.indexOf(b.label);
+    if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    return a.label.localeCompare(b.label, 'de');
+  });
+}
+
 async function renderAbsenzen() {
+  const teamSec = document.getElementById('absTeamSection');
+  if (teamSec) teamSec.classList.toggle('hidden', !IS_ADMIN);
+  await renderAbsenzenMine();
+  if (IS_ADMIN) await renderAbsenzenTeam();
+}
+
+async function renderAbsenzenMine() {
+  const body = document.getElementById('absMineBody');
+  const cards = document.getElementById('absMineCards');
+  const count = document.getElementById('absMineCount');
+  if (!body) return;
+  try {
+    const res = await api('/absences');
+    const groups = res.groups || [];
+    if (count) count.textContent = String(groups.length);
+    if (!groups.length) {
+      body.innerHTML =
+        '<div class="rp-empty" style="box-shadow:none;border:none;">Noch keine Absenzen erfasst.</div>';
+      if (cards) {
+        cards.innerHTML =
+          '<div class="rp-empty" style="box-shadow:none;border:none;">Noch keine Absenzen erfasst.</div>';
+      }
+      return;
+    }
+    body.innerHTML = `<table class="desktop-table">
+      <thead><tr><th>Zeitraum</th><th>Art</th><th>Tage</th><th>Stunden</th><th>Bemerkung</th><th></th></tr></thead>
+      <tbody>${groups
+        .map((g) => {
+          const range =
+            g.from === g.to
+              ? IsoWeek.formatDe(g.from)
+              : `${IsoWeek.formatDe(g.from)} – ${IsoWeek.formatDe(g.to)}`;
+          return `<tr>
+            <td class="mono" style="font-size:13px;">${escapeAttr(range)}</td>
+            <td>${escapeAttr(g.workTypeLabel)}</td>
+            <td class="mono">${escapeAttr(String(g.days))}</td>
+            <td class="mono">${escapeAttr(formatHours(g.hours))}</td>
+            <td style="color:var(--t2);font-size:13px;">${escapeAttr(g.note || '—')}</td>
+            <td><button type="button" class="btn btn-d" onclick="deleteAbsenceGroup('${escapeAttr(g.groupId)}')">Löschen</button></td>
+          </tr>`;
+        })
+        .join('')}</tbody></table>`;
+    if (cards) {
+      cards.innerHTML = groups
+        .map((g) => {
+          const range =
+            g.from === g.to
+              ? IsoWeek.formatDe(g.from)
+              : `${IsoWeek.formatDe(g.from)} – ${IsoWeek.formatDe(g.to)}`;
+          return `<div class="m-card">
+            <div class="m-card-top">
+              <span class="m-card-date">${escapeAttr(range)}</span>
+              <span class="m-card-hours">${escapeAttr(formatHours(g.hours))}</span>
+            </div>
+            <div class="m-card-mid">${escapeAttr(g.workTypeLabel)} · ${escapeAttr(String(g.days))} Tage</div>
+            <div class="m-card-note">${escapeAttr(g.note || '—')}</div>
+            <div class="m-card-acts">
+              <button type="button" class="btn btn-d" onclick="deleteAbsenceGroup('${escapeAttr(g.groupId)}')">Löschen</button>
+            </div>
+          </div>`;
+        })
+        .join('');
+    }
+  } catch (e) {
+    body.innerHTML = `<div class="rp-empty" style="color:var(--red);box-shadow:none;border:none;">${escapeAttr(e.message)}</div>`;
+    if (cards) {
+      cards.innerHTML = `<div class="rp-empty" style="color:var(--red);box-shadow:none;border:none;">${escapeAttr(e.message)}</div>`;
+    }
+  }
+}
+
+async function renderAbsenzenTeam() {
   if (!IS_ADMIN) return;
   const sel = document.getElementById('absMonSel');
   const body = document.getElementById('absBody');
@@ -761,39 +1156,36 @@ async function renderAbsenzen() {
   if (!sel || !body) return;
   if (!sel.options.length) fillMonthSelects();
   const month = sel.value || currentMonthKey();
-  if (title) title.textContent = `Absenzen · ${monthGermanLabel(month)}`;
+  if (title) title.textContent = `Team · ${monthGermanLabel(month)}`;
   try {
     await ensureEntryMasterData();
   } catch (e) {
     body.innerHTML = `<div class="rp-empty" style="color:var(--red);box-shadow:none;border:none;">${escapeAttr(e.message)}</div>`;
     return;
   }
-  const absenceTypes = WORK_TYPES.filter((w) => w.active !== false && w.billable === false).sort((a, b) =>
-    a.label.localeCompare(b.label, 'de')
-  );
+  const absenceTypes = absenceTypesSorted();
   const team = trackedEmps();
   if (!absenceTypes.length) {
-    body.innerHTML = `<div class="rp-empty" style="box-shadow:none;border:none;">Keine Absenz-Arbeitsarten vorhanden.</div>`;
+    body.innerHTML = `<div class="rp-empty" style="box-shadow:none;border:none;">Keine Absenz-Arten vorhanden.</div>`;
     if (badge) badge.textContent = '0,0 h';
     return;
   }
   let grand = 0;
-  const rows = team
-    .map((emp) => {
-      const cells = absenceTypes.map((wt) => {
-        const hrs = ENTRIES.filter(
-          (en) =>
-            en.empId === emp.id &&
-            en.workTypeId === wt.id &&
-            en.date.startsWith(month) &&
-            en.billable === false
-        ).reduce((s, en) => s + entryHoursValue(en), 0);
-        grand += hrs;
-        return hrs;
-      });
-      const rowTotal = cells.reduce((s, h) => s + h, 0);
-      return { emp, cells, rowTotal };
-    })
+  const rows = team.map((emp) => {
+    const cells = absenceTypes.map((wt) => {
+      const hrs = ENTRIES.filter(
+        (en) =>
+          en.empId === emp.id &&
+          en.workTypeId === wt.id &&
+          en.date.startsWith(month) &&
+          en.billable === false
+      ).reduce((s, en) => s + entryHoursValue(en), 0);
+      grand += hrs;
+      return hrs;
+    });
+    const rowTotal = cells.reduce((s, h) => s + h, 0);
+    return { emp, cells, rowTotal };
+  });
   const head = `<tr><th>Mitarbeiter</th>${absenceTypes
     .map((w) => `<th>${escapeAttr(w.label)}</th>`)
     .join('')}<th>Total</th></tr>`;
@@ -817,6 +1209,96 @@ async function renderAbsenzen() {
     </tr>`;
   if (badge) badge.textContent = `${formatHoursDeCsv(grand)} h`;
   body.innerHTML = `<table><thead>${head}</thead><tbody>${bodyRows}${foot}</tbody></table>`;
+}
+
+function showAbsErr(msg) {
+  const el = document.getElementById('absErr');
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.style.display = 'block';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
+  }
+}
+
+async function openAbsenceDialog() {
+  showAbsErr('');
+  try {
+    await ensureEntryMasterData();
+  } catch (e) {
+    toast(e.message);
+    return;
+  }
+  const types = absenceTypesSorted();
+  const typeSel = document.getElementById('absType');
+  if (!types.length) {
+    toast('Keine Absenz-Arten vorhanden.');
+    return;
+  }
+  typeSel.innerHTML = types
+    .map((w) => `<option value="${escapeAttr(w.id)}">${escapeAttr(w.label)}</option>`)
+    .join('');
+  const empFg = document.getElementById('absEmpFg');
+  const empSel = document.getElementById('absEmp');
+  if (IS_ADMIN) {
+    empFg.classList.remove('hidden');
+    empSel.innerHTML = EMPS.map(
+      (e) => `<option value="${escapeAttr(e.id)}">${escapeAttr(formatEmpSelectLabel(e))}</option>`
+    ).join('');
+    empSel.value = curUser || ME.id;
+  } else {
+    empFg.classList.add('hidden');
+  }
+  const t = today();
+  document.getElementById('absFrom').value = t;
+  document.getElementById('absTo').value = t;
+  document.getElementById('absHalfDay').checked = false;
+  document.getElementById('absNote').value = '';
+  openAbsenceSheet();
+}
+
+async function saveAbsence() {
+  showAbsErr('');
+  const workTypeId = document.getElementById('absType').value;
+  const from = document.getElementById('absFrom').value;
+  const to = document.getElementById('absTo').value;
+  const halfDay = document.getElementById('absHalfDay').checked;
+  const note = document.getElementById('absNote').value.trim();
+  if (!workTypeId || !from || !to) {
+    showAbsErr('Bitte Art und Zeitraum angeben.');
+    return;
+  }
+  const body = { workTypeId, from, to, halfDay, note };
+  if (IS_ADMIN) {
+    const uid = document.getElementById('absEmp').value;
+    if (uid) body.userId = uid;
+  }
+  try {
+    const res = await api('/absences', { method: 'POST', body: JSON.stringify(body) });
+    closeM('moAbsence');
+    toast(`${res.days} Tag(e), ${formatHours(res.hours)} erfasst`);
+    await loadData();
+    markLocalEntriesState();
+    refreshCur();
+  } catch (e) {
+    showAbsErr(e.message);
+  }
+}
+
+async function deleteAbsenceGroup(groupId) {
+  if (!groupId) return;
+  if (!confirm('Diese Absenz inkl. aller Tage wirklich löschen?')) return;
+  try {
+    await api(`/absences/${encodeURIComponent(groupId)}`, { method: 'DELETE' });
+    toast('Absenz gelöscht');
+    await loadData();
+    markLocalEntriesState();
+    refreshCur();
+  } catch (e) {
+    toast(e.message);
+  }
 }
 
 async function openInvoiceDownload(invoiceId, format) {
@@ -1288,6 +1770,7 @@ async function loadStammdaten() {
     WORK_TYPES = wRes.workTypes || [];
     COMPANY = coRes.company || null;
     RATES = rRes.rates || [];
+    masterFingerprint = fingerprintMaster(CUSTOMERS, SITES, WORK_TYPES);
     showStammdatenTab(sdTab || 'kunden');
   } catch (e) {
     showSdErr('sdCustErr', e.message);
@@ -1702,20 +2185,40 @@ function renderMeine() {
   }
   list.innerHTML = wEntries
     .map((en) => {
-      const workLbl = entryWorkLabel(en);
-      const siteLbl = entrySiteLabel(en);
-      const meta = isAbsenceEntry(en)
-        ? workLbl || 'Absenz'
-        : [siteLbl, workLbl].filter(Boolean).join(' · ') || en.note || '—';
+      const workLbl = entryWorkLabel(en) || (isAbsenceEntry(en) ? 'Absenz' : 'Arbeitsart');
+      const parts = entrySiteParts(en);
       const absClass = isAbsenceEntry(en) ? ' entry-absence' : '';
       const absBadge = isAbsenceEntry(en) ? '<span class="entry-abs-badge">Absenz</span>' : '';
+      const note = (en.note || '').trim();
+      const siteLine = isAbsenceEntry(en)
+        ? `<div class="ec-project"><div class="ec-site">Absenz${absBadge}</div></div>`
+        : `<div class="ec-project">
+            ${parts.customer ? `<div class="ec-customer">${escapeAttr(parts.customer)}</div>` : ''}
+            <div class="ec-site">${escapeAttr(parts.site || 'Objekt')}</div>
+          </div>`;
+      const desktopMeta = isAbsenceEntry(en)
+        ? workLbl
+        : [entrySiteLabel(en), workLbl].filter(Boolean).join(' · ') || '—';
       return `
-    <div class="ei${absClass}">
+    <div class="ei entry-card${absClass}">
       <div class="ei-dot"></div>
-      <div class="ei-date">${fmtD(en.date)}${absBadge}</div>
+      <div class="entry-card-line1">
+        <div class="ei-date">${fmtD(en.date)}${absBadge}</div>
+        <div class="ei-dur">${mDur(net(en))}</div>
+      </div>
       <div class="ei-time">${entryTimeLabel(en)}</div>
-      <div class="ei-dur">${mDur(net(en))}</div>
-      <div class="ei-note">${escapeAttr(meta)}</div>
+      <div class="entry-card-line2">${escapeAttr(desktopMeta)}</div>
+      <div class="entry-card-line3">${note ? escapeAttr(note) : '—'}</div>
+      <div class="ei-note">${escapeAttr(desktopMeta)}</div>
+      <div class="ec-body">
+        <div class="ec-top">
+          <div class="ec-date">${fmtDShort(en.date)}</div>
+          <div class="ec-hours">${escapeAttr(formatHours(entryHoursValue(en)))}</div>
+        </div>
+        <div class="ec-work">${escapeAttr(workLbl)}</div>
+        ${siteLine}
+        ${note ? `<div class="ec-note">${escapeAttr(note)}</div>` : ''}
+      </div>
       <div class="ei-acts">${entryActionButtonsHtml(en)}</div>
     </div>`;
     })
@@ -1723,10 +2226,12 @@ function renderMeine() {
 }
 
 function renderWeekStrip() {
+  const strip = document.getElementById('weekStrip');
+  if (!strip) return;
   const wk = wkDates();
   const t = today();
   const ns = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-  document.getElementById('weekStrip').innerHTML = wk
+  strip.innerHTML = wk
     .map((d, i) => {
       const mins = ENTRIES.filter((e) => e.empId === curUser && e.date === d).reduce((s, e) => s + net(e), 0);
       const isT = d === t;
@@ -1746,14 +2251,25 @@ function renderMonat() {
   const entries = eEmp(curUser, m).sort((a, b) => (a.date > b.date ? -1 : 1));
   const totHrs = entries.reduce((s, e) => s + entryHoursValue(e), 0);
   document.getElementById('monBadge').textContent = `${formatHours(totHrs)} Total`;
-  document.getElementById('monBody').innerHTML = entries.length
-    ? entries
-        .map((en) => {
-          const alt = isLegacyEntry(en)
-            ? `<span class="entry-alt-badge" title="Aus Von/Bis berechnet">alt</span>`
-            : '';
-          const rowClass = isAbsenceEntry(en) ? 'entry-absence' : '';
-          return `<tr class="${rowClass}">
+  const body = document.getElementById('monBody');
+  const cards = document.getElementById('monCards');
+  if (!entries.length) {
+    if (body) {
+      body.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--t3);">Keine Einträge für diesen Monat.</td></tr>`;
+    }
+    if (cards) {
+      cards.innerHTML = `<div class="rp-empty" style="box-shadow:none;border:none;">Keine Einträge für diesen Monat.</div>`;
+    }
+    return;
+  }
+  if (body) {
+    body.innerHTML = entries
+      .map((en) => {
+        const alt = isLegacyEntry(en)
+          ? `<span class="entry-alt-badge" title="Aus Von/Bis berechnet">alt</span>`
+          : '';
+        const rowClass = isAbsenceEntry(en) ? 'entry-absence' : '';
+        return `<tr class="${rowClass}">
         <td>${fmtD(en.date)}${alt}</td>
         <td>${entryObjektCell(en)}</td>
         <td>${escapeAttr(entryWorkLabel(en) || '—')}</td>
@@ -1761,9 +2277,27 @@ function renderMonat() {
         <td style="color:var(--t2);font-size:13px;">${escapeAttr(en.note || '—')}</td>
         <td>${entryActionButtonsHtml(en)}</td>
       </tr>`;
-        })
-        .join('')
-    : `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--t3);">Keine Einträge für diesen Monat.</td></tr>`;
+      })
+      .join('');
+  }
+  if (cards) {
+    cards.innerHTML = entries
+      .map((en) => {
+        const line2 = isAbsenceEntry(en)
+          ? entryWorkLabel(en) || 'Absenz'
+          : [entrySiteLabel(en), entryWorkLabel(en)].filter(Boolean).join(' · ') || '—';
+        return `<div class="m-card${isAbsenceEntry(en) ? ' entry-absence' : ''}">
+          <div class="m-card-top">
+            <span class="m-card-date">${fmtD(en.date)}</span>
+            <span class="m-card-hours">${escapeAttr(formatHours(entryHoursValue(en)))}</span>
+          </div>
+          <div class="m-card-mid">${escapeAttr(line2)}</div>
+          <div class="m-card-note">${escapeAttr(en.note || '—')}</div>
+          <div class="m-card-acts">${entryActionButtonsHtml(en)}</div>
+        </div>`;
+      })
+      .join('');
+  }
 }
 
 function openRapporteOpenHours() {
@@ -2228,15 +2762,8 @@ function renderLohn() {
 }
 
 async function ensureAlleFilterData() {
-  const needsCust = !CUSTOMERS.length;
-  const needsSites = !SITES.length;
-  const needsWt = !WORK_TYPES.length;
-  if (!needsCust && !needsSites && !needsWt) return;
-  const jobs = [];
-  if (needsCust) jobs.push(api('/customers').then((r) => { CUSTOMERS = r.customers || []; }));
-  if (needsSites) jobs.push(api('/sites').then((r) => { SITES = r.sites || []; }));
-  if (needsWt) jobs.push(api('/work-types').then((r) => { WORK_TYPES = r.workTypes || []; }));
-  await Promise.all(jobs);
+  if (CUSTOMERS.length && SITES.length && WORK_TYPES.length) return;
+  await fetchMasterData();
 }
 
 function fillAlleSel() {
@@ -2262,9 +2789,14 @@ function fillAlleSel() {
   if (wtSel) {
     const prev = wtSel.value;
     const types = WORK_TYPES.filter((w) => w.active !== false);
-    wtSel.innerHTML =
+    const selected = prev ? WORK_TYPES.find((w) => w.id === prev) : null;
+    let html =
       '<option value="">Alle</option>' +
       types.map((w) => `<option value="${escapeAttr(w.id)}">${escapeAttr(w.label)}</option>`).join('');
+    if (selected && selected.active === false) {
+      html += `<option value="${escapeAttr(selected.id)}">${escapeAttr(selected.label)} (inaktiv)</option>`;
+    }
+    wtSel.innerHTML = html;
     if (prev) wtSel.value = prev;
   }
 }
@@ -2348,52 +2880,78 @@ function showEntryErr(msg) {
   }
 }
 
+/** Always fetch current sites/work types (and customers) before entry dropdowns are shown. */
 async function ensureEntryMasterData() {
-  if (SITES.length && WORK_TYPES.length) return;
-  const [sRes, wRes] = await Promise.all([api('/sites'), api('/work-types')]);
-  SITES = sRes.sites || [];
-  WORK_TYPES = wRes.workTypes || [];
+  await fetchMasterData();
+}
+
+function siteOptionLabel(s, { inactive = false } = {}) {
+  const cust = s.customer?.name || CUSTOMERS.find((c) => c.id === s.customerId)?.name || '';
+  const base = cust ? `${cust} — ${s.label}` : s.label || 'Objekt';
+  return inactive || s.active === false ? `${base} (inaktiv)` : base;
 }
 
 function fillEntrySiteSelect(selectedId) {
   const sel = document.getElementById('eSite');
   if (!sel) return;
+  const keep =
+    selectedId !== undefined && selectedId !== null && selectedId !== ''
+      ? selectedId
+      : sel.value || '';
   const active = SITES.filter((s) => s.active !== false);
-  if (!active.length) {
+  const selected = keep ? SITES.find((s) => s.id === keep) : null;
+  const rows = active.slice();
+  if (selected && !rows.some((s) => s.id === selected.id)) {
+    rows.push(selected);
+  } else if (keep && !rows.some((s) => s.id === keep)) {
+    rows.push({
+      id: keep,
+      label: 'Objekt',
+      active: false,
+      customerId: null,
+      customer: null,
+    });
+  }
+  if (!rows.length) {
     sel.innerHTML = '<option value="">Kein aktives Objekt</option>';
     return;
   }
-  sel.innerHTML = active
+  sel.innerHTML = rows
     .map((s) => {
-      const cust = s.customer?.name || '';
-      const label = cust ? `${cust} — ${s.label}` : s.label;
-      return `<option value="${escapeAttr(s.id)}" ${s.id === selectedId ? 'selected' : ''}>${escapeAttr(label)}</option>`;
+      const inactive = s.active === false;
+      return `<option value="${escapeAttr(s.id)}">${escapeAttr(siteOptionLabel(s, { inactive }))}</option>`;
     })
     .join('');
-  if (selectedId && active.some((s) => s.id === selectedId)) sel.value = selectedId;
+  if (keep) sel.value = keep;
 }
 
 function fillEntryWorkTypeSelect(selectedId) {
   const sel = document.getElementById('eWorkType');
   if (!sel) return;
-  const active = WORK_TYPES.filter((w) => w.active !== false);
-  const arbeit = active.filter((w) => w.billable !== false);
-  const absenz = active.filter((w) => w.billable === false);
-  if (!active.length) {
+  const keep =
+    selectedId !== undefined && selectedId !== null && selectedId !== ''
+      ? selectedId
+      : sel.value || '';
+  // Hours dialog: billable work types only (absences use «Absenzen»).
+  const active = WORK_TYPES.filter((w) => w.active !== false && w.billable !== false);
+  const selected = keep ? WORK_TYPES.find((w) => w.id === keep) : null;
+  const opt = (w, inactive = false) => {
+    const label = inactive || w.active === false ? `${w.label} (inaktiv)` : w.label;
+    return `<option value="${escapeAttr(w.id)}">${escapeAttr(label)}</option>`;
+  };
+  let html = active.map((w) => opt(w)).join('');
+  if (selected && (selected.active === false || selected.billable === false)) {
+    html += opt(selected, true);
+  } else if (keep && !active.some((w) => w.id === keep) && !selected) {
+    html += `<option value="${escapeAttr(keep)}">Arbeitsart (inaktiv)</option>`;
+  }
+  if (!html) {
     sel.innerHTML = '<option value="">Keine aktive Arbeitsart</option>';
+    onEntryWorkTypeChange();
     return;
   }
-  const opt = (w) =>
-    `<option value="${escapeAttr(w.id)}" ${w.id === selectedId ? 'selected' : ''}>${escapeAttr(w.label)}</option>`;
-  let html = '';
-  if (arbeit.length) {
-    html += `<optgroup label="Arbeit">${arbeit.map(opt).join('')}</optgroup>`;
-  }
-  if (absenz.length) {
-    html += `<optgroup label="Absenz">${absenz.map(opt).join('')}</optgroup>`;
-  }
   sel.innerHTML = html;
-  if (selectedId && active.some((w) => w.id === selectedId)) sel.value = selectedId;
+  if (keep) sel.value = keep;
   onEntryWorkTypeChange();
 }
 
@@ -2403,16 +2961,10 @@ function selectedEntryWorkType() {
 }
 
 function onEntryWorkTypeChange() {
-  const wt = selectedEntryWorkType();
-  const isAbsence = wt && wt.billable === false;
   const siteFg = document.getElementById('eSiteFg');
   const hoursLabel = document.getElementById('eHoursLabel');
-  if (siteFg) siteFg.style.display = isAbsence ? 'none' : '';
-  if (hoursLabel) {
-    hoursLabel.textContent = isAbsence
-      ? 'Stunden (z.B. 8 für einen ganzen Tag)'
-      : 'Stunden';
-  }
+  if (siteFg) siteFg.style.display = '';
+  if (hoursLabel) hoursLabel.textContent = 'Stunden';
 }
 
 function calcPreview() {
@@ -2434,6 +2986,19 @@ function calcPreview() {
   const el = document.getElementById(id);
   if (el) el.addEventListener('input', calcPreview);
 });
+{
+  const dateEl = document.getElementById('eDate');
+  if (dateEl) {
+    dateEl.addEventListener('input', syncEntryDateDisplay);
+    dateEl.addEventListener('change', syncEntryDateDisplay);
+  }
+  ['absFrom', 'absTo'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', syncAbsenceDateDisplays);
+    el.addEventListener('change', syncAbsenceDateDisplays);
+  });
+}
 
 async function openAdd(date) {
   if (IS_ADMIN && !EMPS.length) {
@@ -2457,7 +3022,7 @@ async function openAdd(date) {
   } catch (e) {
     showEntryErr(e.message);
   }
-  document.getElementById('moEntry').classList.add('open');
+  openEntrySheet();
 }
 
 function openAddDate(d) {
@@ -2467,6 +3032,11 @@ function openAddDate(d) {
 async function openEdit(id) {
   const en = ENTRIES.find((e) => e.id === id);
   if (!en) return;
+  if (isAbsenceEntry(en)) {
+    toast('Absenzen bitte unter «Absenzen» verwalten.');
+    showView('absenzen');
+    return;
+  }
   if (isEntryInvoiced(en)) {
     toast(`Verrechnet auf Rechnung ${en.invoiceNumber} — Bearbeitung gesperrt`);
     return;
@@ -2489,7 +3059,7 @@ async function openEdit(id) {
   } catch (e) {
     showEntryErr(e.message);
   }
-  document.getElementById('moEntry').classList.add('open');
+  openEntrySheet();
 }
 
 function collectEntryForm() {
@@ -2499,13 +3069,15 @@ function collectEntryForm() {
   const hours = Number(document.getElementById('eHours').value);
   const note = document.getElementById('eNote').value.trim();
   const wt = WORK_TYPES.find((w) => w.id === workTypeId);
-  const isAbsence = wt && wt.billable === false;
-  const siteId = isAbsence ? null : document.getElementById('eSite').value;
+  const siteId = document.getElementById('eSite').value;
 
   if (!date) return { error: 'Bitte ein Datum wählen.' };
   if (!workTypeId) return { error: 'Bitte eine Arbeitsart wählen.' };
-  if (!isAbsence && !siteId) {
-    return { error: 'Für verrechenbare Arbeit ist ein Objekt erforderlich.' };
+  if (wt && wt.billable === false) {
+    return { error: 'Absenzen bitte unter «Absenzen» erfassen.' };
+  }
+  if (!siteId) {
+    return { error: 'Bitte ein Objekt wählen.' };
   }
   const hoursCheck = EntryLimits.validateEntryHours(hours);
   if (!hoursCheck.ok) return { error: hoursCheck.error };
@@ -2808,12 +3380,62 @@ async function saveEditEmp() {
 }
 
 function closeM(id) {
-  document.getElementById(id).classList.remove('open');
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('open');
+  if (id === 'moEntry' || id === 'moAbsence') {
+    document.body.classList.remove('entry-sheet-open');
+  }
+}
+
+function syncDateDisplay(inputId, displayId, emptyLabel) {
+  const input = document.getElementById(inputId);
+  const disp = document.getElementById(displayId);
+  if (!input || !disp) return;
+  const v = input.value;
+  if (!v) {
+    disp.textContent = emptyLabel || 'Datum wählen';
+    disp.classList.add('is-empty');
+    return;
+  }
+  disp.classList.remove('is-empty');
+  disp.textContent = fmtD(v);
+}
+
+function syncEntryDateDisplay() {
+  syncDateDisplay('eDate', 'eDateDisplay', 'Datum wählen');
+}
+
+function syncAbsenceDateDisplays() {
+  syncDateDisplay('absFrom', 'absFromDisplay', 'Von wählen');
+  syncDateDisplay('absTo', 'absToDisplay', 'Bis wählen');
+}
+
+function openEntrySheet() {
+  document.body.classList.add('entry-sheet-open');
+  document.getElementById('moEntry').classList.add('open');
+  syncEntryDateDisplay();
+}
+
+function openAbsenceSheet() {
+  document.body.classList.add('entry-sheet-open');
+  document.getElementById('moAbsence').classList.add('open');
+  syncAbsenceDateDisplays();
 }
 
 document.querySelectorAll('.mo').forEach((m) => {
   m.addEventListener('click', (e) => {
-    if (e.target === m) m.classList.remove('open');
+    if (e.target !== m) return;
+    // Full-screen sheets: no backdrop dismiss on phone.
+    if (
+      (m.id === 'moEntry' || m.id === 'moAbsence') &&
+      window.matchMedia('(max-width: 767px)').matches
+    ) {
+      return;
+    }
+    m.classList.remove('open');
+    if (m.id === 'moEntry' || m.id === 'moAbsence') {
+      document.body.classList.remove('entry-sheet-open');
+    }
   });
 });
 
@@ -2840,6 +3462,8 @@ function initAfterLogin() {
   if (sw) sw.value = curUser;
   syncSidebarFromCur();
   tick();
+  bindMobileBottomNav();
+  activeViewName = '';
   showView(IS_ADMIN ? 'dashboard' : 'meine');
   startEntrySync();
 }
@@ -2893,10 +3517,9 @@ async function trySession() {
 }
 
 document.getElementById('loginBtn').addEventListener('click', doLogin);
-document.getElementById('logoutBtn').addEventListener('click', () => {
-  stopEntrySync();
-  localStorage.removeItem(TOKEN_KEY);
-  window.location.reload();
-});
+document.getElementById('logoutBtn').addEventListener('click', doLogout);
+const profilLogoutBtn = document.getElementById('profilLogoutBtn');
+if (profilLogoutBtn) profilLogoutBtn.addEventListener('click', doLogout);
 
+bindMobileBottomNav();
 trySession();

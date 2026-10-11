@@ -1,0 +1,26 @@
+{
+  "name": "Saniga Zeiterfassung",
+  "short_name": "Saniga",
+  "description": "Stunden und Absenzen für Saniga AG erfassen",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#eef5f8",
+  "theme_color": "#12B8E1",
+  "lang": "de",
+  "icons": [
+    {
+      "src": "/assets/logo-saniga.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/logo-saniga.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
