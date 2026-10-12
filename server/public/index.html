@@ -167,6 +167,21 @@ body {
 .stat-card { background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow);position:relative;overflow:hidden; }
 .stat-card-link { cursor:pointer;transition:border-color .15s,box-shadow .15s; }
 .stat-card-link:hover { border-color:var(--saniga-red);box-shadow:0 6px 20px rgba(196,48,48,.12); }
+#dOpenCard.is-attention {
+  background: linear-gradient(180deg, #fff8f0 0%, #fff 70%);
+  box-shadow: 0 0 0 1px rgba(217,119,6,.22), 0 1px 2px rgba(21,40,48,.04);
+}
+#dOpenCard.is-attention .stat-accent { background: linear-gradient(90deg, #d97706, #f59e0b) !important; }
+#dOpenCard.is-attention .stat-val { color: #c2410c !important; }
+#dOpenCard.is-critical {
+  background: linear-gradient(180deg, #fff5f5 0%, #fff 72%);
+  box-shadow: 0 0 0 1px rgba(220,38,38,.28), 0 1px 2px rgba(21,40,48,.04);
+}
+#dOpenCard.is-critical .stat-accent { background: linear-gradient(90deg, #b91c1c, #ef4444) !important; }
+#dOpenCard.is-critical .stat-val { color: var(--red) !important; }
+#dOpenCard.is-clear .stat-val { color: var(--t2) !important; }
+.dash-open-section.is-attention { border-color: rgba(217,119,6,.35); background: #fffbf5; }
+.dash-open-section.is-critical { border-color: rgba(220,38,38,.35); background: #fff8f8; }
 .stat-accent { position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius) var(--radius) 0 0; }
 .stat-lbl { font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px; }
 .stat-val { font-size:30px;font-weight:800;color:var(--t1);line-height:1; }
@@ -180,6 +195,10 @@ body {
 .dash-open-table tr.dash-open-stale td:first-child { box-shadow:inset 3px 0 0 var(--saniga-red); }
 .dash-open-age { font-family:'JetBrains Mono',monospace;font-size:12px; }
 .dash-open-age.stale { color:var(--saniga-red);font-weight:700; }
+.dash-actions { display:none; }
+.dash-open-cards { display:none; }
+.dash-open-cta { display:none; }
+.dash-open-table-wrap { overflow-x:auto; }
 
 /* ── GRID ── */
 .grid2 { display:grid;grid-template-columns:1fr 1fr;gap:20px; }
@@ -230,6 +249,14 @@ td { padding:12px 18px;font-size:13.5px;color:var(--t1); }
 .sd-row-inactive:hover { background:rgba(240,242,247,.95); }
 .sd-inline-input { margin:0;padding:7px 10px;font-size:13px; }
 .sd-actions { display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end; }
+.sd-mobile-list { display:none; }
+.sd-edit-sheet { display:none; }
+.rp-phone-bar { display:none; }
+.rp-filter-btn { display:none; }
+.rp-filter-sheet-head { display:none; }
+.rp-filter-apply { display:none; }
+.rp-entry-cards { display:none; }
+.rp-toolbar-inner { display:contents; }
 
 .legacy-time-fields { display:none !important; }
 
@@ -435,6 +462,10 @@ select option { background:white; }
 .team-page-layout { display:grid;grid-template-columns:1fr minmax(280px,340px);gap:20px;align-items:start; }
 @media (max-width:980px) { .team-page-layout { grid-template-columns:1fr; } }
 .team-profile-aside { padding:22px;position:sticky;top:24px; }
+.team-detail-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.team-detail-close { display:none; }
+.team-detail-title { margin:0 !important; }
+.team-emp-chevron { display:none; }
 .team-prof-placeholder { text-align:center;padding:28px 16px;color:var(--t3);font-size:13px;line-height:1.55; }
 .team-prof-placeholder svg { display:block;margin:0 auto 14px; }
 .team-prof-placeholder p { max-width:240px;margin:0 auto; }
@@ -515,6 +546,19 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     justify-content: space-between;
   }
   .topbar-title { display: none; }
+  body.role-admin .topbar-title {
+    display: block !important;
+    flex: 1;
+    min-width: 0;
+    font-size: 16px;
+    font-weight: 750;
+    color: var(--t1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  body.role-admin .topbar-user { display: none !important; }
   .topbar-user {
     display: block !important;
     flex: 1;
@@ -570,7 +614,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     display: flex;
     position: fixed;
     left: 0; right: 0; bottom: 0;
-    z-index: 90;
+    z-index: 240;
     height: var(--mnav-h);
     box-sizing: border-box;
     background: #0f1f25;
@@ -582,6 +626,9 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     touch-action: manipulation;
     -webkit-user-select: none;
     user-select: none;
+  }
+  body.admin-more-open .mobile-bottom-nav {
+    z-index: 250;
   }
   .mobile-bottom-nav .mbnav-item {
     flex: 1 1 0;
@@ -689,6 +736,654 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   }
 
   .grid2 { grid-template-columns: 1fr !important; gap: 14px; }
+
+  /* Admin dashboard — phone app home (no duplicate shortcuts; bottom nav covers that) */
+  #view-dashboard .dash-actions { display: none !important; }
+  #view-dashboard .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  #view-dashboard .stat-card {
+    padding: 14px 14px 12px;
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(21,40,48,.04);
+  }
+  #view-dashboard .stat-lbl {
+    font-size: 10px;
+    letter-spacing: .04em;
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+  #view-dashboard .stat-val {
+    font-size: 22px;
+    letter-spacing: -0.02em;
+  }
+  #view-dashboard #dLohn.stat-val,
+  #view-dashboard .stat-card .stat-val[style*="font-size:21px"] {
+    font-size: 18px !important;
+  }
+  #view-dashboard .stat-sub {
+    font-size: 11px;
+    margin-top: 4px;
+    line-height: 1.3;
+  }
+  #view-dashboard #dOpenCard.is-attention {
+    background: linear-gradient(180deg, #fff8f0 0%, #fff 70%);
+    box-shadow: 0 0 0 1px rgba(217,119,6,.22), 0 1px 2px rgba(21,40,48,.04);
+  }
+  #view-dashboard #dOpenCard.is-attention .stat-accent {
+    background: linear-gradient(90deg, #d97706, #f59e0b) !important;
+  }
+  #view-dashboard #dOpenCard.is-attention .stat-val { color: #c2410c !important; }
+  #view-dashboard #dOpenCard.is-critical {
+    background: linear-gradient(180deg, #fff5f5 0%, #fff 72%);
+    box-shadow: 0 0 0 1px rgba(220,38,38,.28), 0 1px 2px rgba(21,40,48,.04);
+  }
+  #view-dashboard #dOpenCard.is-critical .stat-accent {
+    background: linear-gradient(90deg, #b91c1c, #ef4444) !important;
+  }
+  #view-dashboard #dOpenCard.is-critical .stat-val { color: var(--red) !important; }
+  #view-dashboard #dOpenCard.is-clear .stat-val { color: var(--t2) !important; }
+  #view-dashboard .dash-open-section {
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 2px rgba(21,40,48,.04);
+    border: 1px solid var(--border);
+  }
+  #view-dashboard .dash-open-section.is-attention {
+    border-color: rgba(217,119,6,.35);
+    background: #fffbf5;
+  }
+  #view-dashboard .dash-open-section.is-critical {
+    border-color: rgba(196,48,48,.35);
+    background: #fff8f8;
+  }
+  #view-dashboard .dash-open-section .card-header {
+    padding: 12px 14px;
+    border-bottom: none;
+  }
+  #view-dashboard .dash-open-section.is-attention .card-title::before,
+  #view-dashboard .dash-open-section.is-critical .card-title::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: 1px;
+    background: #d97706;
+  }
+  #view-dashboard .dash-open-section.is-critical .card-title::before {
+    background: var(--red);
+  }
+  #view-dashboard .dash-open-section.is-attention #dOpenCount {
+    background: rgba(217,119,6,.16);
+    color: #9a3412;
+  }
+  #view-dashboard .dash-open-section.is-critical #dOpenCount {
+    background: rgba(220,38,38,.14);
+    color: var(--red);
+  }
+  #view-dashboard .dash-open-table-wrap { display: none !important; }
+  #view-dashboard .dash-open-cards {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 12px 12px;
+  }
+  #view-dashboard .dash-open-card {
+    width: 100%;
+    text-align: left;
+    border: 1px solid rgba(217,119,6,.22);
+    border-radius: 12px;
+    background: #fff;
+    padding: 12px 14px;
+    font-family: inherit;
+    color: inherit;
+    cursor: pointer;
+    touch-action: manipulation;
+    box-shadow: inset 3px 0 0 #f59e0b;
+  }
+  #view-dashboard .dash-open-card.is-missing {
+    border-color: rgba(220,38,38,.28);
+    box-shadow: inset 3px 0 0 var(--red);
+    background: #fffafa;
+  }
+  #view-dashboard .dash-open-card.is-stale {
+    border-color: rgba(220,38,38,.4);
+    background: rgba(220,38,38,.06);
+    box-shadow: inset 3px 0 0 var(--red);
+  }
+  #view-dashboard .dash-open-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  #view-dashboard .dash-open-card-cust {
+    font-size: 14px;
+    font-weight: 750;
+    color: var(--t1);
+    line-height: 1.25;
+  }
+  #view-dashboard .dash-open-card-hrs {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 800;
+    color: #c2410c;
+    flex-shrink: 0;
+  }
+  #view-dashboard .dash-open-card.is-missing .dash-open-card-hrs,
+  #view-dashboard .dash-open-card.is-stale .dash-open-card-hrs {
+    color: var(--red);
+  }
+  #view-dashboard .dash-open-card-site {
+    font-size: 12px;
+    color: var(--t2);
+    margin-bottom: 8px;
+  }
+  #view-dashboard .dash-open-card-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--t3);
+  }
+  #view-dashboard .dash-open-card-meta .stale { color: var(--red); font-weight: 700; }
+  #view-dashboard .dash-open-empty {
+    padding: 18px 8px;
+    text-align: center;
+    color: var(--t3);
+    font-size: 13px;
+  }
+  #view-dashboard .dash-open-cta {
+    display: flex !important;
+    width: calc(100% - 24px);
+    margin: 0 12px 14px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg,#12B8E1,#3dc4ea);
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  #view-dashboard .dash-team-card,
+  #view-dashboard .dash-week-card {
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(21,40,48,.04);
+  }
+  #view-dashboard .dash-week-card { padding: 14px !important; }
+  #view-dashboard .dash-week-card .card-title { margin-bottom: 12px !important; font-size: 14px; }
+  #view-dashboard #dTeam .ei {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  #view-dashboard #dTeam .ei > div:nth-child(3) {
+    display: none; /* hide role label on phone — keeps row readable */
+  }
+  #view-dashboard .dash-open-warn {
+    font-size: 12px;
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    background: rgba(196,48,48,.08);
+    border: 1px solid rgba(196,48,48,.22);
+    border-radius: 12px;
+    color: #9f1f1f;
+  }
+
+  /* Team — list → detail sheet */
+  #view-team .team-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  #view-team .team-toolbar > div[style*="flex:1"] { display: none; }
+  #view-team .team-mon-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--t2);
+  }
+  #view-team #teamMonSel {
+    min-height: 48px;
+    font-size: 16px;
+    width: 100%;
+  }
+  #view-team .team-toolbar .btn {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+  }
+  #view-team .team-page-layout {
+    display: block;
+  }
+  #view-team .grid3 {
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #view-team .emp-card.team-emp-pick {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    margin: 0;
+    box-shadow: 0 1px 2px rgba(21,40,48,.04);
+  }
+  #view-team .emp-card.team-emp-pick > div:first-child {
+    margin-bottom: 0 !important;
+    flex: 1;
+    min-width: 0;
+  }
+  #view-team .emp-card.team-emp-pick > div:nth-child(2),
+  #view-team .emp-card.team-emp-pick > div:nth-child(3) {
+    display: none !important; /* compact list row on phone */
+  }
+  #view-team .team-emp-chevron {
+    display: flex !important;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    color: var(--t3);
+    flex-shrink: 0;
+  }
+  #view-team .team-emp-chevron svg { width: 18px; height: 18px; }
+  #view-team .team-emp-pick.is-selected {
+    border-color: var(--saniga-red);
+    background: rgba(18,184,225,.06);
+  }
+  #view-team .team-profile-aside {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 220;
+    top: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-height: none !important;
+    overflow: hidden;
+    display: flex !important;
+    flex-direction: column;
+    transform: translateY(104%);
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform .2s ease, visibility .2s;
+    background: #fff !important;
+  }
+  body.team-detail-open #view-team .team-profile-aside {
+    transform: none;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  body.team-detail-open {
+    overflow: hidden;
+  }
+  body.team-detail-open .mobile-bottom-nav,
+  body.team-detail-open .mobile-fab {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  #view-team .team-detail-head {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: #fff;
+  }
+  #view-team .team-detail-close {
+    display: inline-flex !important;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #f3f7f9;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--t1);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  #view-team .team-detail-title {
+    margin: 0 !important;
+    font-size: 16px;
+  }
+  #view-team .team-prof-placeholder,
+  #view-team .team-prof-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+  #view-team .team-prof-placeholder { display: none !important; }
+  #view-team .team-prof-actions .btn { min-height: 48px; }
+
+  /* Stammdaten — stacked forms, scroll tabs, list cards */
+  #view-stammdaten .sd-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px;
+    margin: 0 -4px 14px;
+    padding: 0 4px 4px;
+    scrollbar-width: none;
+  }
+  #view-stammdaten .sd-tabs::-webkit-scrollbar { display: none; }
+  #view-stammdaten .sd-tab {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 10px 14px;
+    font-size: 13px;
+    touch-action: manipulation;
+  }
+  #view-stammdaten .sd-form,
+  #view-stammdaten .sd-form-cust,
+  #view-stammdaten .sd-form-firma,
+  #view-stammdaten .sd-form[style] {
+    grid-template-columns: 1fr !important;
+  }
+  #view-stammdaten .sd-form-actions {
+    justify-content: stretch !important;
+  }
+  #view-stammdaten .sd-form-actions .btn,
+  #view-stammdaten .sd-form > .btn {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+  }
+  #view-stammdaten .sd-form .fg input,
+  #view-stammdaten .sd-form .fg select,
+  #view-stammdaten .sd-form-firma .fg input {
+    min-height: 48px;
+    font-size: 16px;
+  }
+  #view-stammdaten .sd-form .fg-check {
+    padding: 12px 0;
+    min-height: 48px;
+  }
+  #view-stammdaten .card > table,
+  #view-stammdaten .card > .card-header + table {
+    display: none !important;
+  }
+  #view-stammdaten .sd-mobile-list {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+  }
+  .sd-row-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #fff;
+    cursor: pointer;
+    touch-action: manipulation;
+    font-family: inherit;
+    color: inherit;
+  }
+  .sd-row-card.is-inactive { opacity: .55; }
+  .sd-row-main { flex: 1; min-width: 0; }
+  .sd-row-title { font-size: 15px; font-weight: 700; color: var(--t1); }
+  .sd-row-meta { font-size: 12px; color: var(--t3); margin-top: 3px; line-height: 1.35; }
+  .sd-row-chevron {
+    display: flex;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    color: var(--t3);
+    flex-shrink: 0;
+  }
+  .sd-row-chevron svg { width: 18px; height: 18px; }
+  .sd-row-act {
+    flex-shrink: 0;
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  body.sd-detail-open { overflow: hidden; }
+  body.sd-detail-open .mobile-bottom-nav,
+  body.sd-detail-open .mobile-fab {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  #sdEditSheet.sd-edit-sheet {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 230;
+    display: none;
+    flex-direction: column;
+    background: #fff;
+  }
+  body.sd-detail-open #sdEditSheet.sd-edit-sheet {
+    display: flex !important;
+  }
+  #sdEditSheet .sd-edit-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #sdEditSheet .sd-edit-close {
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #f3f7f9;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--t1);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  #sdEditSheet .sd-edit-title { margin: 0 !important; font-size: 16px; }
+  #sdEditSheet .sd-edit-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+  #sdEditSheet .sd-edit-body .fg { margin-bottom: 12px; }
+  #sdEditSheet .sd-edit-body input,
+  #sdEditSheet .sd-edit-body select {
+    min-height: 48px;
+    font-size: 16px;
+    width: 100%;
+  }
+  #sdEditSheet .sd-edit-body .btn { width: 100%; min-height: 48px; justify-content: center; }
+
+  /* Rapporte — filter sheet + entry cards */
+  #view-rapporte .rp-phone-bar {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  #view-rapporte .rp-phone-bar .rp-filter-summary {
+    flex: 1;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  #view-rapporte .rp-filter-btn {
+    display: inline-flex !important;
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 0 14px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    color: var(--t1);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  #view-rapporte > .rp-filter-summary { display: none !important; }
+  #view-rapporte .rp-toolbar {
+    position: fixed;
+    inset: 0;
+    z-index: 225;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: rgba(15, 31, 37, .45);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    transform: translateY(104%);
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform .2s ease, visibility .2s;
+  }
+  body.rp-filter-open #view-rapporte .rp-toolbar {
+    transform: none;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  body.rp-filter-open { overflow: hidden; }
+  body.rp-filter-open .mobile-bottom-nav,
+  body.rp-filter-open .mobile-fab {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  #view-rapporte .rp-toolbar-inner {
+    background: #fff;
+    border-radius: 18px 18px 0 0;
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    max-height: min(88dvh, 720px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #view-rapporte .rp-filter-sheet-head {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  #view-rapporte .rp-filter-sheet-head .card-title { margin: 0; flex: 1; font-size: 16px; }
+  #view-rapporte .rp-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #view-rapporte .rp-mode-toggle { width: 100%; }
+  #view-rapporte .rp-mode-toggle button { flex: 1; min-height: 44px; }
+  #view-rapporte .rp-fg { min-width: 0; width: 100%; }
+  #view-rapporte .rp-fg input,
+  #view-rapporte .rp-fg select { height: 48px; font-size: 16px; }
+  #view-rapporte .rp-presets { width: 100%; }
+  #view-rapporte .rp-presets .btn { flex: 1; min-height: 44px; justify-content: center; }
+  #view-rapporte .rp-filter-apply {
+    display: flex !important;
+    margin-top: 14px;
+  }
+  #view-rapporte .rp-filter-apply .btn { width: 100%; min-height: 48px; justify-content: center; }
+  #view-rapporte .rp-customer { padding: 14px 14px !important; }
+  #view-rapporte .rp-customer-head { flex-wrap: wrap; gap: 6px; }
+  #view-rapporte .rp-site { padding: 12px; }
+  #view-rapporte .rp-site-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #view-rapporte .rp-site-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+  #view-rapporte .rp-site-actions .btn {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+  }
+  #view-rapporte .rp-site > table { display: none !important; }
+  #view-rapporte .rp-entry-cards {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .rp-entry-card {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid var(--border);
+  }
+  .rp-entry-card.is-invoiced { opacity: .65; background: rgba(240,242,247,.9); }
+  .rp-entry-card-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: baseline;
+  }
+  .rp-entry-card-date { font-size: 13px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .rp-entry-card-hrs { font-size: 14px; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--saniga-red); }
+  .rp-entry-card-mid { font-size: 12px; color: var(--t2); margin-top: 4px; }
+  .rp-entry-card-note { font-size: 12px; color: var(--t3); margin-top: 4px; }
+
+  /* Rechnungen — phone polish */
+  #view-rechnungen .inv-row {
+    padding: 14px;
+    border-radius: 14px;
+    gap: 12px;
+  }
+  #view-rechnungen .inv-row-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  #view-rechnungen .inv-row-total {
+    font-size: 16px;
+    font-weight: 800;
+  }
+  #view-rechnungen .inv-row-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+  #view-rechnungen .inv-row-actions .btn {
+    min-height: 44px;
+    justify-content: center;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+  #view-rechnungen .inv-cancel-panel input {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
   .wstrip {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -824,7 +1519,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   #view-absenzen > div:first-child .btn { min-height: 48px; width: 100%; justify-content: center; }
   #view-absenzen select { min-height: 48px; font-size: 16px; }
 
-  /* Hours entry — true full-screen sheet (covers nav/FAB) */
+  /* Hours entry — full-screen sheet covers nav/FAB; Mehr keeps nav visible */
   body.entry-sheet-open {
     overflow: hidden;
   }
@@ -833,6 +1528,120 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     visibility: hidden;
     pointer-events: none;
   }
+  body.admin-more-open {
+    overflow: hidden;
+  }
+  body.admin-more-open .mobile-fab {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* Admin «Mehr» hub — sits above content, stops above bottom nav */
+  #moAdminMore {
+    position: fixed !important;
+    inset: 0 !important;
+    bottom: var(--mnav-h) !important;
+    z-index: 220 !important;
+    background: rgba(15, 31, 37, .45) !important;
+    backdrop-filter: none !important;
+    align-items: flex-end !important;
+    justify-content: stretch !important;
+    padding: 0 !important;
+  }
+  #moAdminMore .admin-more-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: min(78dvh, 640px) !important;
+    border-radius: 18px 18px 0 0 !important;
+    border: none !important;
+    box-shadow: 0 -8px 32px rgba(15,31,37,.2) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    transform: translateY(12px);
+    transition: transform .18s ease;
+    background: #fff !important;
+  }
+  #moAdminMore.open .admin-more-box { transform: none; }
+  .admin-more-head {
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 12px !important;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .admin-more-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 12px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+  .admin-more-sec {
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--t3);
+    margin: 14px 8px 8px;
+  }
+  .admin-more-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-align: left;
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px 14px;
+    margin-bottom: 8px;
+    font-family: inherit;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .admin-more-item.is-pressed,
+  .admin-more-item:active {
+    background: #f3f7f9;
+  }
+  .admin-more-ico {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #eef5f8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--saniga-red);
+  }
+  .admin-more-ico svg { width: 20px; height: 20px; }
+  .admin-more-txt {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .admin-more-txt strong {
+    font-size: 15px;
+    font-weight: 750;
+    color: var(--t1);
+  }
+  .admin-more-txt small {
+    font-size: 12px;
+    color: var(--t3);
+    font-weight: 500;
+  }
+  .admin-more-danger .admin-more-ico {
+    background: rgba(196,48,48,.1);
+    color: var(--red);
+  }
+  .admin-more-danger .admin-more-txt strong { color: var(--red); }
   #moEntry {
     position: fixed !important;
     inset: 0 !important;
@@ -1230,7 +2039,10 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 }
 
 @media (min-width: 768px) {
-  .mobile-bottom-nav, .mobile-fab, .mobile-cards, .topbar-user, .topbar-logo { display: none !important; }
+  .mobile-bottom-nav, .mobile-fab, .mobile-cards, .topbar-user, .topbar-logo, #moAdminMore { display: none !important; }
+  .dash-actions, .dash-open-cards, .dash-open-cta { display: none !important; }
+  .dash-open-table-wrap { display: block !important; }
+  body.role-admin .topbar-title { display: block; } /* desktop already shows title */
   .desktop-table { display: table; }
   #absMineBody { display: block; }
   .entry-card-line2, .entry-card-line3 { display: none; }
@@ -1428,11 +2240,17 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 
     <!-- ═══ DASHBOARD ═══ -->
     <div class="view" id="view-dashboard">
+      <nav class="dash-actions" aria-label="Schnellzugriff">
+        <button type="button" class="dash-action" onclick="showView('rapporte')">Rapporte</button>
+        <button type="button" class="dash-action" onclick="showView('team')">Team</button>
+        <button type="button" class="dash-action" onclick="showView('stammdaten')">Stammdaten</button>
+        <button type="button" class="dash-action" onclick="openAdminMoreSheet()">Mehr</button>
+      </nav>
       <div class="stats-grid mb24">
-        <div class="stat-card stat-card-link" id="dOpenCard" role="button" tabindex="0" onclick="openRapporteOpenHours()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openRapporteOpenHours();}">
-          <div class="stat-accent" style="background:linear-gradient(90deg,var(--saniga-red),var(--saniga-red-l));"></div>
+        <div class="stat-card stat-card-link is-clear" id="dOpenCard" role="button" tabindex="0" onclick="openRapporteOpenHours()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openRapporteOpenHours();}">
+          <div class="stat-accent" style="background:linear-gradient(90deg,#d97706,#f59e0b);"></div>
           <div class="stat-lbl">Offene Stunden</div>
-          <div class="stat-val" style="color:var(--saniga-red);" id="dOpenHrs">—</div>
+          <div class="stat-val" id="dOpenHrs">—</div>
           <div class="stat-sub" id="dOpenAmt">netto CHF —</div>
         </div>
         <div class="stat-card">
@@ -1455,12 +2273,12 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         </div>
       </div>
       <p class="dash-open-warn" id="dOpenMissing" style="display:none;"></p>
-      <div class="card mb24">
+      <div class="card mb24 dash-open-section">
         <div class="card-header">
           <div class="card-title">Nicht verrechnet</div>
           <span class="badge bo" id="dOpenCount">0</span>
         </div>
-        <div style="overflow-x:auto;">
+        <div class="dash-open-table-wrap">
           <table class="dash-open-table">
             <thead>
               <tr>
@@ -1473,16 +2291,18 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             <tbody id="dOpenBody"></tbody>
           </table>
         </div>
+        <div class="dash-open-cards" id="dOpenCards" aria-live="polite"></div>
+        <button type="button" class="dash-open-cta" onclick="openRapporteOpenHours()">Offene Stunden in Rapporten öffnen</button>
       </div>
-      <div class="grid2">
-        <div class="card">
+      <div class="grid2 dash-lower">
+        <div class="card dash-team-card">
           <div class="card-header">
             <div class="card-title">Teamstatus heute</div>
             <span class="badge bg"><span class="bdot"></span>Live</span>
           </div>
           <div id="dTeam"></div>
         </div>
-        <div class="card" style="padding:20px;">
+        <div class="card dash-week-card" style="padding:20px;">
           <div class="card-title" style="margin-bottom:18px;">Woche KW <span id="dKW"></span></div>
           <div id="dWkProg" style="display:flex;flex-direction:column;gap:16px;"></div>
         </div>
@@ -1504,13 +2324,16 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       </div>
       <div class="team-page-layout">
         <div class="grid3" id="teamGrid"></div>
-        <aside class="card team-profile-aside">
+        <aside class="card team-profile-aside" id="teamProfileAside" aria-label="Mitarbeiterprofil">
+          <div class="team-detail-head">
+            <button type="button" class="team-detail-close" onclick="closeTeamDetail()" aria-label="Schliessen">×</button>
+            <div class="card-title team-detail-title">Profil</div>
+          </div>
           <div id="teamProfPlaceholder" class="team-prof-placeholder">
             <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--t4)" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             <p>Wählen Sie einen Mitarbeiter in der Liste, um das Profil mit Statistik und letzten Einträgen anzuzeigen.</p>
           </div>
           <div id="teamProfBody" class="team-prof-body" style="display:none;">
-            <div class="card-title" style="margin-bottom:14px;">Profil</div>
             <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
               <div class="emp-av team-prof-av" id="teamProfAv"></div>
               <div>
@@ -1545,8 +2368,8 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             </div>
           </div>
         </aside>
-            </div>
-          </div>
+      </div>
+    </div>
 
     <!-- ═══ STAMMDATEN ═══ -->
     <div class="view" id="view-stammdaten">
@@ -1581,6 +2404,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             <thead><tr><th>Name</th><th>Strasse</th><th>PLZ</th><th>Ort</th><th>Kontakt</th><th>Tage</th><th></th></tr></thead>
             <tbody id="sdCustBody"></tbody>
           </table>
+          <div class="sd-mobile-list" id="sdCustCards" aria-label="Kundenliste"></div>
         </div>
       </div>
 
@@ -1605,6 +2429,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             <thead><tr><th>Bezeichnung</th><th>Objekt-Nr.</th><th>Kunde</th><th>Adresse</th><th>Status</th><th></th></tr></thead>
             <tbody id="sdSiteBody"></tbody>
           </table>
+          <div class="sd-mobile-list" id="sdSiteCards" aria-label="Objektliste"></div>
         </div>
       </div>
 
@@ -1630,6 +2455,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             <thead><tr><th>Bezeichnung</th><th>verrechenbar</th><th>Status</th><th></th></tr></thead>
             <tbody id="sdWtBody"></tbody>
           </table>
+          <div class="sd-mobile-list" id="sdWtCards" aria-label="Arbeitsartenliste"></div>
         </div>
       </div>
 
@@ -1657,6 +2483,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
             <thead><tr><th>Kunde</th><th>Arbeitsart</th><th>Mitarbeiter</th><th>CHF/Stunde</th><th>gültig ab</th><th>gültig bis</th></tr></thead>
             <tbody id="sdRateBody"></tbody>
           </table>
+          <div class="sd-mobile-list" id="sdRateCards" aria-label="Ansatzliste"></div>
         </div>
       </div>
 
@@ -1677,6 +2504,24 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           </div>
           <p class="sd-err" id="sdCoErr"></p>
           <p style="font-size:12px;color:var(--t3);margin:8px 0 0;">MWST.-Nr., Satz und Startnummer gelten für neue Rechnungen. Die Startnummer greift pro Jahr, solange noch keine höhere Nummer existiert.</p>
+        </div>
+      </div>
+
+      <div id="sdEditSheet" class="sd-edit-sheet" aria-hidden="true">
+        <div class="sd-edit-head">
+          <button type="button" class="sd-edit-close" onclick="closeSdEditSheet()" aria-label="Schliessen">×</button>
+          <div class="card-title sd-edit-title" id="sdEditTitle">Kunde bearbeiten</div>
+        </div>
+        <div class="sd-edit-body">
+          <input type="hidden" id="sdEditCustId" value="">
+          <div class="fg"><label for="sdEditCustName">Name *</label><input type="text" id="sdEditCustName" maxlength="200"></div>
+          <div class="fg"><label for="sdEditCustStreet">Strasse</label><input type="text" id="sdEditCustStreet" maxlength="500"></div>
+          <div class="fg"><label for="sdEditCustZip">PLZ</label><input type="text" id="sdEditCustZip" maxlength="20"></div>
+          <div class="fg"><label for="sdEditCustCity">Ort</label><input type="text" id="sdEditCustCity" maxlength="120"></div>
+          <div class="fg"><label for="sdEditCustContact">Kontaktperson</label><input type="text" id="sdEditCustContact" maxlength="200"></div>
+          <div class="fg"><label for="sdEditCustPay">Zahlungsziel (Tage)</label><input type="number" id="sdEditCustPay" min="0" max="365" step="1"></div>
+          <p class="sd-err" id="sdEditCustErr"></p>
+          <button type="button" class="btn btn-p" onclick="saveSdCustomerEdit()">Speichern</button>
         </div>
       </div>
     </div>
@@ -1850,38 +2695,51 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 
     <!-- ═══ RAPPORTE ═══ -->
     <div class="view" id="view-rapporte">
-      <div class="rp-toolbar">
-        <div class="rp-toolbar-row">
-          <div class="rp-mode-toggle" role="group" aria-label="Ansicht">
-            <button type="button" id="rpModeOpen" class="active" onclick="setReportMode('open')">Offene Stunden</button>
-            <button type="button" id="rpModeRange" onclick="setReportMode('range')">Zeitraum</button>
+      <div class="rp-phone-bar">
+        <div class="rp-filter-summary" id="rpFilterSummaryPhone"></div>
+        <button type="button" class="rp-filter-btn" onclick="openRpFilterSheet()">Filter</button>
+      </div>
+      <div class="rp-toolbar" id="rpToolbar" onclick="if(event.target===this)closeRpFilterSheet()">
+        <div class="rp-toolbar-inner">
+          <div class="rp-filter-sheet-head">
+            <div class="card-title">Filter</div>
+            <button type="button" class="btn btn-g" onclick="closeRpFilterSheet()" aria-label="Schliessen">×</button>
           </div>
-          <div class="rp-fg">
-            <label for="rpCustomer">Kunde</label>
-            <select id="rpCustomer" onchange="onReportFilterChange()">
-              <option value="">Alle</option>
-            </select>
+          <div class="rp-toolbar-row">
+            <div class="rp-mode-toggle" role="group" aria-label="Ansicht">
+              <button type="button" id="rpModeOpen" class="active" onclick="setReportMode('open')">Offene Stunden</button>
+              <button type="button" id="rpModeRange" onclick="setReportMode('range')">Zeitraum</button>
+            </div>
+            <div class="rp-fg">
+              <label for="rpCustomer">Kunde</label>
+              <select id="rpCustomer" onchange="onReportFilterChange()">
+                <option value="">Alle</option>
+              </select>
+            </div>
+            <div class="rp-fg">
+              <label for="rpWorkType">Arbeitsart</label>
+              <select id="rpWorkType" onchange="onReportFilterChange()">
+                <option value="">Alle</option>
+              </select>
+            </div>
           </div>
-          <div class="rp-fg">
-            <label for="rpWorkType">Arbeitsart</label>
-            <select id="rpWorkType" onchange="onReportFilterChange()">
-              <option value="">Alle</option>
-            </select>
+          <div class="rp-toolbar-row" id="rpRangeRow" style="display:none;">
+            <div class="rp-fg">
+              <label for="rpFrom">Von</label>
+              <input type="date" id="rpFrom" onchange="onReportFilterChange()">
+            </div>
+            <div class="rp-fg">
+              <label for="rpTo">Bis</label>
+              <input type="date" id="rpTo" onchange="onReportFilterChange()">
+            </div>
+            <div class="rp-presets">
+              <button type="button" class="btn btn-g" onclick="setReportPreset('thisWeek')">Diese Woche</button>
+              <button type="button" class="btn btn-g" onclick="setReportPreset('lastWeek')">Letzte Woche</button>
+              <button type="button" class="btn btn-g" onclick="setReportPreset('thisMonth')">Dieser Monat</button>
+            </div>
           </div>
-        </div>
-        <div class="rp-toolbar-row" id="rpRangeRow" style="display:none;">
-          <div class="rp-fg">
-            <label for="rpFrom">Von</label>
-            <input type="date" id="rpFrom" onchange="onReportFilterChange()">
-          </div>
-          <div class="rp-fg">
-            <label for="rpTo">Bis</label>
-            <input type="date" id="rpTo" onchange="onReportFilterChange()">
-          </div>
-          <div class="rp-presets">
-            <button type="button" class="btn btn-g" onclick="setReportPreset('thisWeek')">Diese Woche</button>
-            <button type="button" class="btn btn-g" onclick="setReportPreset('lastWeek')">Letzte Woche</button>
-            <button type="button" class="btn btn-g" onclick="setReportPreset('thisMonth')">Dieser Monat</button>
+          <div class="rp-filter-apply">
+            <button type="button" class="btn btn-p" onclick="closeRpFilterSheet()">Anwenden</button>
           </div>
         </div>
       </div>
@@ -1953,23 +2811,68 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 </main>
 
 <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Hauptnavigation">
-  <button type="button" class="mbnav-item active" data-view="meine" aria-label="Zeiten">
-    <span class="mbnav-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-    <span class="mbnav-lbl">Zeiten</span>
-  </button>
-  <button type="button" class="mbnav-item" data-view="monat" aria-label="Monat">
-    <span class="mbnav-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg></span>
-    <span class="mbnav-lbl">Monat</span>
-  </button>
-  <button type="button" class="mbnav-item" data-view="absenzen" aria-label="Absenzen">
-    <span class="mbnav-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 7.8a3.5 3.5 0 0 0-5-5L5 13l-1.5 5.5L9 17l10.2-9.2z"/><path d="M14.5 4.5l5 5"/></svg></span>
-    <span class="mbnav-lbl">Absenz</span>
-  </button>
-  <button type="button" class="mbnav-item" data-view="profil" aria-label="Profil">
-    <span class="mbnav-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-    <span class="mbnav-lbl">Profil</span>
-  </button>
+  <!-- Filled by renderMobileBottomNav() for employee vs admin -->
 </nav>
+
+<!-- Admin «Mehr» hub (phone) -->
+<div class="mo admin-more-sheet" id="moAdminMore" aria-hidden="true">
+  <div class="mo-box admin-more-box" role="dialog" aria-modal="true" aria-labelledby="adminMoreTitle">
+    <div class="mo-sheet-head admin-more-head">
+      <div style="min-width:0;flex:1;">
+        <div class="mo-title" id="adminMoreTitle">Mehr</div>
+        <div class="mo-sub">Admin &amp; persönliche Bereiche</div>
+      </div>
+      <button type="button" class="mo-sheet-close" id="adminMoreClose" aria-label="Schliessen">×</button>
+    </div>
+    <div class="mo-scroll admin-more-scroll">
+      <div class="admin-more-sec">Verwaltung</div>
+      <button type="button" class="admin-more-item" data-more-view="stammdaten">
+        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg></span>
+        <span class="admin-more-txt"><strong>Stammdaten</strong><small>Kunden, Objekte, Ansätze</small></span>
+      </button>
+      <button type="button" class="admin-more-item" data-more-view="rechnungen">
+        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg></span>
+        <span class="admin-more-txt"><strong>Rechnungen</strong><small>Erstellte Rechnungen</small></span>
+      </button>
+      <button type="button" class="admin-more-item" data-more-view="stundenexport">
+        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+        <span class="admin-more-txt"><strong>Stundenexport</strong><small>CSV für Treuhänder</small></span>
+      </button>
+      <button type="button" class="admin-more-item" data-more-view="alle">
+        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+        <span class="admin-more-txt"><strong>Alle Einträge</strong><small>Team-Zeiten filtern</small></span>
+      </button>
+
+      <div class="admin-more-sec">Persönlich</div>
+      <button type="button" class="admin-more-item" data-more-view="meine">
+        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+        <span class="admin-more-txt"><strong>Meine Zeiten</strong><small>Eigene Stunden erfassen</small></span>
+      </button>
+      <button type="button" class="admin-more-item" data-more-view="monat">
+        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+        <span class="admin-more-txt"><strong>Monatsübersicht</strong><small>Eigene Monatswerte</small></span>
+      </button>
+      <button type="button" class="admin-more-item" data-more-view="absenzen">
+        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.2 7.8a3.5 3.5 0 0 0-5-5L5 13l-1.5 5.5L9 17l10.2-9.2z"/></svg></span>
+        <span class="admin-more-txt"><strong>Absenzen</strong><small>Ferien, Krankheit, Feiertage</small></span>
+      </button>
+      <button type="button" class="admin-more-item" data-more-view="profil">
+        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+        <span class="admin-more-txt"><strong>Profil</strong><small>Name, Passwort, Sync</small></span>
+      </button>
+
+      <div class="admin-more-sec">Konto</div>
+      <a class="admin-more-item" id="adminMoreInvite" href="/join.html">
+        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></span>
+        <span class="admin-more-txt"><strong>Mitarbeiter einladen</strong><small>Einladungslink öffnen</small></span>
+      </a>
+      <button type="button" class="admin-more-item admin-more-danger" id="adminMoreLogout">
+        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+        <span class="admin-more-txt"><strong>Abmelden</strong><small>Sitzung beenden</small></span>
+      </button>
+    </div>
+  </div>
+</div>
 <button type="button" class="mobile-fab" id="mobileFab" data-action="add-hours">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   Stunden erfassen

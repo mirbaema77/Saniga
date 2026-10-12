@@ -387,11 +387,122 @@ function syncLohnEditability() {
 }
 
 function applyRoleUI() {
+  document.body.classList.toggle('role-admin', !!IS_ADMIN);
   document.querySelectorAll('.admin-only-nav').forEach((el) => {
     if (IS_ADMIN) el.classList.remove('hidden');
     else el.classList.add('hidden');
   });
+  renderMobileBottomNav();
   // syncLohnEditability(); // payroll UI hidden — Treuhänder handles Lohn
+}
+
+/** Views reached via admin «Mehr» hub (not primary bottom tabs). */
+const ADMIN_MEHR_VIEWS = new Set([
+  'stammdaten',
+  'rechnungen',
+  'stundenexport',
+  'alle',
+  'meine',
+  'monat',
+  'absenzen',
+  'profil',
+]);
+
+function mbnavBtn(view, label, svgInner, { active = false } = {}) {
+  return `<button type="button" class="mbnav-item${active ? ' active' : ''}" data-view="${view}" aria-label="${escapeAttr(label)}">
+    <span class="mbnav-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${svgInner}</svg></span>
+    <span class="mbnav-lbl">${escapeAttr(label)}</span>
+  </button>`;
+}
+
+function renderMobileBottomNav() {
+  const nav = document.getElementById('mobileBottomNav');
+  if (!nav) return;
+  const cur = activeViewName || (IS_ADMIN ? 'dashboard' : 'meine');
+  if (IS_ADMIN) {
+    const mehrActive = ADMIN_MEHR_VIEWS.has(cur);
+    nav.innerHTML =
+      mbnavBtn(
+        'dashboard',
+        'Home',
+        '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+        { active: cur === 'dashboard' }
+      ) +
+      mbnavBtn(
+        'team',
+        'Team',
+        '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+        { active: cur === 'team' }
+      ) +
+      mbnavBtn(
+        'rapporte',
+        'Rapporte',
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
+        { active: cur === 'rapporte' }
+      ) +
+      mbnavBtn(
+        'mehr',
+        'Mehr',
+        '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+        { active: mehrActive }
+      );
+  } else {
+    nav.innerHTML =
+      mbnavBtn(
+        'meine',
+        'Zeiten',
+        '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        { active: cur === 'meine' }
+      ) +
+      mbnavBtn(
+        'monat',
+        'Monat',
+        '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
+        { active: cur === 'monat' }
+      ) +
+      mbnavBtn(
+        'absenzen',
+        'Absenz',
+        '<path d="M20.2 7.8a3.5 3.5 0 0 0-5-5L5 13l-1.5 5.5L9 17l10.2-9.2z"/><path d="M14.5 4.5l5 5"/>',
+        { active: cur === 'absenzen' }
+      ) +
+      mbnavBtn(
+        'profil',
+        'Profil',
+        '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        { active: cur === 'profil' }
+      );
+  }
+}
+
+function openAdminMoreSheet() {
+  const sheet = document.getElementById('moAdminMore');
+  if (!sheet) return;
+  sheet.classList.add('open');
+  sheet.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('admin-more-open');
+  document.querySelectorAll('#mobileBottomNav .mbnav-item').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-view') === 'mehr');
+  });
+}
+
+function closeAdminMoreSheet() {
+  const sheet = document.getElementById('moAdminMore');
+  if (!sheet) return;
+  sheet.classList.remove('open');
+  sheet.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('admin-more-open');
+  syncMobileChrome(activeViewName || 'dashboard');
+}
+
+function pickAdminMoreView(view) {
+  if (!view) {
+    closeAdminMoreSheet();
+    return;
+  }
+  // Navigate first so the destination paints, then close the sheet.
+  closeAdminMoreSheet();
+  showView(view);
 }
 
 function ge(id) {
@@ -613,8 +724,14 @@ const TITLES = {
 let activeViewName = '';
 
 function syncMobileChrome(n) {
-  document.querySelectorAll('.mbnav-item').forEach((btn) => {
-    btn.classList.toggle('active', btn.getAttribute('data-view') === n);
+  const mehrOpen = document.getElementById('moAdminMore')?.classList.contains('open');
+  document.querySelectorAll('#mobileBottomNav .mbnav-item').forEach((btn) => {
+    const v = btn.getAttribute('data-view');
+    let on = v === n;
+    if (IS_ADMIN && v === 'mehr') {
+      on = mehrOpen || ADMIN_MEHR_VIEWS.has(n);
+    }
+    btn.classList.toggle('active', on);
   });
   const fab = document.getElementById('mobileFab');
   if (fab) {
@@ -628,6 +745,10 @@ function syncMobileChrome(n) {
 
 function showView(n) {
   if (!n) return;
+  if (n !== 'mehr') closeAdminMoreSheet();
+  if (n !== 'team') closeTeamDetail();
+  if (n !== 'stammdaten') closeSdEditSheet();
+  if (n !== 'rapporte') closeRpFilterSheet();
   // Same tab: only refresh chrome, don't re-fetch (avoids “dead” taps while sync runs).
   if (n === activeViewName) {
     syncMobileChrome(n);
@@ -657,19 +778,35 @@ function showView(n) {
   }
 }
 
-/** Instant bottom-nav response on iPhone (pointerdown, no click delay / swallowed first tap). */
+/** Instant bottom-nav response on iPhone (pointerup with small move = tap). */
 function bindMobileBottomNav() {
   const nav = document.getElementById('mobileBottomNav');
   if (!nav || nav.dataset.bound === '1') return;
   nav.dataset.bound = '1';
   let lastPointerView = '';
   let lastPointerAt = 0;
+  let pressBtn = null;
+  let pressX = 0;
+  let pressY = 0;
+  let pressId = null;
+  let navLockUntil = 0;
 
   function go(btn) {
     if (!btn || !nav.contains(btn)) return false;
     const view = btn.getAttribute('data-view');
     if (!view) return false;
+    const now = Date.now();
+    if (now < navLockUntil && view === lastPointerView) return true;
+    navLockUntil = now + 320;
+    lastPointerView = view;
+    lastPointerAt = now;
     btn.classList.add('is-pressed');
+    if (view === 'mehr') {
+      if (document.getElementById('moAdminMore')?.classList.contains('open')) closeAdminMoreSheet();
+      else openAdminMoreSheet();
+      return true;
+    }
+    closeAdminMoreSheet();
     showView(view);
     return true;
   }
@@ -679,21 +816,44 @@ function bindMobileBottomNav() {
     (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const btn = e.target.closest('.mbnav-item');
-      if (!go(btn)) return;
-      lastPointerView = btn.getAttribute('data-view') || '';
-      lastPointerAt = Date.now();
-      // Stop the delayed click that iOS fires afterwards (felt like “tap does nothing”).
-      e.preventDefault();
+      if (!btn || !nav.contains(btn)) return;
+      pressBtn = btn;
+      pressX = e.clientX;
+      pressY = e.clientY;
+      pressId = e.pointerId;
+      btn.classList.add('is-pressed');
+      try {
+        btn.setPointerCapture(e.pointerId);
+      } catch (_) {
+        /* ignore */
+      }
     },
-    { passive: false }
+    { passive: true }
   );
 
-  const clearPressed = () => {
+  function endPress(e, commit) {
+    if (pressId != null && e.pointerId !== pressId) return;
+    const btn = pressBtn;
+    const dx = Math.abs((e.clientX || 0) - pressX);
+    const dy = Math.abs((e.clientY || 0) - pressY);
+    pressBtn = null;
+    pressId = null;
     nav.querySelectorAll('.is-pressed').forEach((b) => b.classList.remove('is-pressed'));
-  };
-  nav.addEventListener('pointerup', clearPressed);
-  nav.addEventListener('pointercancel', clearPressed);
-  nav.addEventListener('pointerleave', clearPressed);
+    if (!commit || !btn) return;
+    if (dx > 14 || dy > 14) return;
+    go(btn);
+    e.preventDefault();
+  }
+
+  nav.addEventListener(
+    'pointerup',
+    (e) => endPress(e, true),
+    { passive: false }
+  );
+  nav.addEventListener('pointercancel', (e) => endPress(e, false));
+  nav.addEventListener('pointerleave', (e) => {
+    if (pressId != null && e.pointerId === pressId && e.target === nav) endPress(e, false);
+  });
 
   // Keyboard / desktop fallback when pointerdown was not used
   nav.addEventListener('click', (e) => {
@@ -703,6 +863,83 @@ function bindMobileBottomNav() {
     const view = btn.getAttribute('data-view') || '';
     if (view && view === lastPointerView && Date.now() - lastPointerAt < 450) return;
     go(btn);
+  });
+}
+
+function bindAdminMoreSheet() {
+  const sheet = document.getElementById('moAdminMore');
+  if (!sheet || sheet.dataset.bound === '1') return;
+  sheet.dataset.bound = '1';
+
+  const closeBtn = document.getElementById('adminMoreClose');
+  if (closeBtn) closeBtn.addEventListener('click', () => closeAdminMoreSheet());
+
+  sheet.addEventListener('click', (e) => {
+    if (e.target === sheet) closeAdminMoreSheet();
+  });
+
+  const logoutBtn = document.getElementById('adminMoreLogout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      closeAdminMoreSheet();
+      doLogout();
+    });
+  }
+
+  let lastKey = '';
+  let lastAt = 0;
+  let pressItem = null;
+  let pressX = 0;
+  let pressY = 0;
+  let pressId = null;
+
+  sheet.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const item = e.target.closest('[data-more-view]');
+      if (!item || !sheet.contains(item)) return;
+      pressItem = item;
+      pressX = e.clientX;
+      pressY = e.clientY;
+      pressId = e.pointerId;
+      item.classList.add('is-pressed');
+    },
+    { passive: true }
+  );
+
+  function endMorePress(e, commit) {
+    if (pressId != null && e.pointerId !== pressId) return;
+    const item = pressItem;
+    const dx = Math.abs((e.clientX || 0) - pressX);
+    const dy = Math.abs((e.clientY || 0) - pressY);
+    pressItem = null;
+    pressId = null;
+    sheet.querySelectorAll('.is-pressed').forEach((b) => b.classList.remove('is-pressed'));
+    if (!commit || !item) return;
+    // Allow list scrolling — only treat as tap if finger barely moved
+    if (dx > 12 || dy > 12) return;
+    const view = item.getAttribute('data-more-view');
+    if (!view) return;
+    lastKey = view;
+    lastAt = Date.now();
+    e.preventDefault();
+    pickAdminMoreView(view);
+  }
+
+  sheet.addEventListener('pointerup', (e) => endMorePress(e, true), { passive: false });
+  sheet.addEventListener('pointercancel', (e) => endMorePress(e, false));
+
+  sheet.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-more-view]');
+    if (!item || !sheet.contains(item)) return;
+    const view = item.getAttribute('data-more-view') || '';
+    if (view && view === lastKey && Date.now() - lastAt < 450) {
+      e.preventDefault();
+      return;
+    }
+    e.preventDefault();
+    pickAdminMoreView(view);
   });
 }
 
@@ -1003,8 +1240,20 @@ function reportFilterSummaryText() {
 }
 
 function updateReportFilterSummary() {
+  const text = reportFilterSummaryText();
   const el = document.getElementById('rpFilterSummary');
-  if (el) el.textContent = reportFilterSummaryText();
+  if (el) el.textContent = text;
+  const phone = document.getElementById('rpFilterSummaryPhone');
+  if (phone) phone.textContent = text;
+}
+
+function openRpFilterSheet() {
+  if (!isPhoneLayout()) return;
+  document.body.classList.add('rp-filter-open');
+}
+
+function closeRpFilterSheet() {
+  document.body.classList.remove('rp-filter-open');
 }
 
 function setReportMode(mode) {
@@ -1557,6 +1806,26 @@ function renderReports(data) {
             </tr>`;
             })
             .join('');
+          const entryCards = entries
+            .map((en) => {
+              const invoiced = !!(en.invoiceId || en.invoiceNumber);
+              const nonBillable = en.billable === false;
+              const invBadge = en.invoiceNumber
+                ? `<span class="rp-inv-badge">${escapeAttr(en.invoiceNumber)}</span>`
+                : '';
+              const nbBadge = nonBillable
+                ? `<span class="rp-nb-badge">nicht verrechenbar</span>`
+                : '';
+              return `<div class="rp-entry-card${invoiced ? ' is-invoiced' : ''}">
+              <div class="rp-entry-card-top">
+                <span class="rp-entry-card-date">${escapeAttr(fmtD(en.date))}${invBadge}</span>
+                <span class="rp-entry-card-hrs">${escapeAttr(formatReportHours(en.hours))} h</span>
+              </div>
+              <div class="rp-entry-card-mid">${escapeAttr(en.employeeName)} · ${escapeAttr(en.workType)}${nbBadge}</div>
+              ${en.note ? `<div class="rp-entry-card-note">${escapeAttr(en.note)}</div>` : ''}
+            </div>`;
+            })
+            .join('');
           const createBtn = openBillable.length
             ? `<button type="button" class="btn btn-g" data-rp-create-inv onclick="createReportInvoice('${escapeAttr(s.id)}')">Rechnung erstellen</button>`
             : '';
@@ -1581,6 +1850,7 @@ function renderReports(data) {
               <thead><tr><th>Datum</th><th>Mitarbeiter</th><th>Arbeit</th><th>Stunden</th><th>Bemerkung</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>
+            <div class="rp-entry-cards">${entryCards}</div>
           </div>`;
         })
         .join('');
@@ -1958,13 +2228,19 @@ function formatRateYmdDe(ymd) {
   return IsoWeek.formatDe(ymd);
 }
 
+function sdChevronHtml() {
+  return `<span class="sd-row-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg></span>`;
+}
+
 function renderRates() {
   const body = document.getElementById('sdRateBody');
+  const cards = document.getElementById('sdRateCards');
   const count = document.getElementById('sdRateCount');
   if (!body) return;
   if (count) count.textContent = String(RATES.length);
   if (!RATES.length) {
     body.innerHTML = '<tr><td colspan="6" style="color:var(--t3);">Noch keine Ansätze.</td></tr>';
+    if (cards) cards.innerHTML = '<div style="color:var(--t3);font-size:13px;padding:8px 2px;">Noch keine Ansätze.</div>';
     return;
   }
   body.innerHTML = RATES.map((r) => {
@@ -1980,6 +2256,20 @@ function renderRates() {
       <td>${escapeAttr(formatRateYmdDe(r.validTo))}</td>
     </tr>`;
   }).join('');
+  if (cards) {
+    cards.innerHTML = RATES.map((r) => {
+      const cust = r.customer?.name || 'Alle';
+      const wt = r.workType?.label || 'Alle';
+      const emp = r.user?.name || 'Alle';
+      const range = `${formatRateYmdDe(r.validFrom)} – ${formatRateYmdDe(r.validTo)}`;
+      return `<div class="sd-row-card" style="cursor:default;">
+        <div class="sd-row-main">
+          <div class="sd-row-title">CHF ${escapeAttr(formatSwissChf(r.chfPerHour))}/h</div>
+          <div class="sd-row-meta">${escapeAttr(cust)} · ${escapeAttr(wt)} · ${escapeAttr(emp)}<br>${escapeAttr(range)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
 }
 
 async function addRate() {
@@ -2032,11 +2322,13 @@ function fillSiteCustomerSelect() {
 
 function renderCustomers() {
   const body = document.getElementById('sdCustBody');
+  const cards = document.getElementById('sdCustCards');
   const count = document.getElementById('sdCustCount');
   if (!body) return;
   if (count) count.textContent = String(CUSTOMERS.length);
   if (!CUSTOMERS.length) {
     body.innerHTML = '<tr><td colspan="7" style="color:var(--t3);">Noch keine Kunden.</td></tr>';
+    if (cards) cards.innerHTML = '<div style="color:var(--t3);font-size:13px;padding:8px 2px;">Noch keine Kunden.</div>';
     return;
   }
   body.innerHTML = CUSTOMERS.map((c) => {
@@ -2052,6 +2344,75 @@ function renderCustomers() {
       <td><div class="sd-actions"><button type="button" class="btn btn-g" onclick="saveCustomer('${id}')">Speichern</button></div></td>
     </tr>`;
   }).join('');
+  if (cards) {
+    cards.innerHTML = CUSTOMERS.map((c) => {
+      const id = escapeAttr(c.id);
+      const place = [c.postalCode, c.city].filter(Boolean).join(' ') || c.street || '—';
+      const meta = c.contactPerson ? `${place} · ${c.contactPerson}` : place;
+      return `<button type="button" class="sd-row-card" onclick="openSdCustomerEdit('${id}')">
+        <div class="sd-row-main">
+          <div class="sd-row-title">${escapeAttr(c.name || '')}</div>
+          <div class="sd-row-meta">${escapeAttr(meta)}</div>
+        </div>
+        ${sdChevronHtml()}
+      </button>`;
+    }).join('');
+  }
+}
+
+function openSdCustomerEdit(id) {
+  const c = CUSTOMERS.find((x) => x.id === id);
+  if (!c) return;
+  showSdErr('sdEditCustErr', '');
+  document.getElementById('sdEditCustId').value = c.id;
+  document.getElementById('sdEditCustName').value = c.name || '';
+  document.getElementById('sdEditCustStreet').value = c.street || '';
+  document.getElementById('sdEditCustZip').value = c.postalCode || '';
+  document.getElementById('sdEditCustCity').value = c.city || '';
+  document.getElementById('sdEditCustContact').value = c.contactPerson || '';
+  document.getElementById('sdEditCustPay').value = String(
+    c.paymentTermDays == null ? 14 : Number(c.paymentTermDays)
+  );
+  const title = document.getElementById('sdEditTitle');
+  if (title) title.textContent = c.name || 'Kunde bearbeiten';
+  document.body.classList.add('sd-detail-open');
+  const sheet = document.getElementById('sdEditSheet');
+  if (sheet) sheet.setAttribute('aria-hidden', 'false');
+}
+
+function closeSdEditSheet() {
+  document.body.classList.remove('sd-detail-open');
+  const sheet = document.getElementById('sdEditSheet');
+  if (sheet) sheet.setAttribute('aria-hidden', 'true');
+}
+
+async function saveSdCustomerEdit() {
+  showSdErr('sdEditCustErr', '');
+  const id = document.getElementById('sdEditCustId')?.value;
+  const name = (document.getElementById('sdEditCustName')?.value || '').trim();
+  if (!id || !name) {
+    showSdErr('sdEditCustErr', 'Name darf nicht leer sein.');
+    return;
+  }
+  const paymentTermDays = Number(document.getElementById('sdEditCustPay')?.value);
+  try {
+    await api(`/customers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name,
+        street: (document.getElementById('sdEditCustStreet')?.value || '').trim() || null,
+        postalCode: (document.getElementById('sdEditCustZip')?.value || '').trim() || null,
+        city: (document.getElementById('sdEditCustCity')?.value || '').trim() || null,
+        contactPerson: (document.getElementById('sdEditCustContact')?.value || '').trim() || null,
+        paymentTermDays: Number.isFinite(paymentTermDays) ? paymentTermDays : 14,
+      }),
+    });
+    toast('Kunde gespeichert');
+    closeSdEditSheet();
+    await loadStammdaten();
+  } catch (e) {
+    showSdErr('sdEditCustErr', e.message);
+  }
 }
 
 function readCustomerForm() {
@@ -2163,11 +2524,13 @@ async function saveCompany() {
 
 function renderSites() {
   const body = document.getElementById('sdSiteBody');
+  const cards = document.getElementById('sdSiteCards');
   const count = document.getElementById('sdSiteCount');
   if (!body) return;
   if (count) count.textContent = String(SITES.length);
   if (!SITES.length) {
     body.innerHTML = '<tr><td colspan="6" style="color:var(--t3);">Noch keine Objekte.</td></tr>';
+    if (cards) cards.innerHTML = '<div style="color:var(--t3);font-size:13px;padding:8px 2px;">Noch keine Objekte.</div>';
     return;
   }
   body.innerHTML = SITES.map((s) => {
@@ -2185,6 +2548,21 @@ function renderSites() {
       </div></td>
     </tr>`;
   }).join('');
+  if (cards) {
+    cards.innerHTML = SITES.map((s) => {
+      const id = escapeAttr(s.id);
+      const custName = s.customer?.name || '—';
+      const active = s.active !== false;
+      const meta = [custName, s.objectNumber, s.address].filter(Boolean).join(' · ');
+      return `<div class="sd-row-card ${active ? '' : 'is-inactive'}" style="cursor:default;">
+        <div class="sd-row-main">
+          <div class="sd-row-title">${escapeAttr(s.label || '')}</div>
+          <div class="sd-row-meta">${escapeAttr(meta)} · ${active ? 'aktiv' : 'inaktiv'}</div>
+        </div>
+        <button type="button" class="btn btn-g sd-row-act" onclick="toggleSiteActive('${id}', ${active ? 'false' : 'true'})">${active ? 'Aus' : 'An'}</button>
+      </div>`;
+    }).join('');
+  }
 }
 
 async function addSite() {
@@ -2237,11 +2615,13 @@ async function toggleSiteActive(id, active) {
 
 function renderWorkTypes() {
   const body = document.getElementById('sdWtBody');
+  const cards = document.getElementById('sdWtCards');
   const count = document.getElementById('sdWtCount');
   if (!body) return;
   if (count) count.textContent = String(WORK_TYPES.length);
   if (!WORK_TYPES.length) {
     body.innerHTML = '<tr><td colspan="4" style="color:var(--t3);">Noch keine Arbeitsarten.</td></tr>';
+    if (cards) cards.innerHTML = '<div style="color:var(--t3);font-size:13px;padding:8px 2px;">Noch keine Arbeitsarten.</div>';
     return;
   }
   body.innerHTML = WORK_TYPES.map((w) => {
@@ -2257,6 +2637,20 @@ function renderWorkTypes() {
       </div></td>
     </tr>`;
   }).join('');
+  if (cards) {
+    cards.innerHTML = WORK_TYPES.map((w) => {
+      const id = escapeAttr(w.id);
+      const active = w.active !== false;
+      const billable = w.billable !== false;
+      return `<div class="sd-row-card ${active ? '' : 'is-inactive'}" style="cursor:default;">
+        <div class="sd-row-main">
+          <div class="sd-row-title">${escapeAttr(w.label || '')}</div>
+          <div class="sd-row-meta">${billable ? 'verrechenbar' : 'nicht verrechenbar'} · ${active ? 'aktiv' : 'inaktiv'}</div>
+        </div>
+        <button type="button" class="btn btn-g sd-row-act" onclick="toggleWorkTypeActive('${id}', ${active ? 'false' : 'true'})">${active ? 'Aus' : 'An'}</button>
+      </div>`;
+    }).join('');
+  }
 }
 
 async function addWorkType() {
@@ -2462,8 +2856,11 @@ function renderDashOpenBlock(stats) {
   const hrsEl = document.getElementById('dOpenHrs');
   const amtEl = document.getElementById('dOpenAmt');
   const body = document.getElementById('dOpenBody');
+  const cards = document.getElementById('dOpenCards');
   const count = document.getElementById('dOpenCount');
   const warn = document.getElementById('dOpenMissing');
+  const openCard = document.getElementById('dOpenCard');
+  const section = document.querySelector('#view-dashboard .dash-open-section');
   if (!hrsEl || !amtEl || !body) return;
 
   const totalHours = Number(stats?.totalHours || 0);
@@ -2475,8 +2872,22 @@ function renderDashOpenBlock(stats) {
   if (count) count.textContent = String(sites.length);
 
   const missing = stats?.missingRate || { count: 0, hours: 0 };
+  const hasMissing = missing.count > 0;
+  const hasStale = sites.some((s) => Number(s.ageDays) > 21);
+  const hasOpen = totalHours > 0 || sites.length > 0;
+  const isCritical = hasMissing || hasStale;
+  if (openCard) {
+    openCard.classList.toggle('is-attention', hasOpen && !isCritical);
+    openCard.classList.toggle('is-critical', hasOpen && isCritical);
+    openCard.classList.toggle('is-clear', !hasOpen);
+  }
+  if (section) {
+    section.classList.toggle('is-attention', hasOpen && !isCritical);
+    section.classList.toggle('is-critical', hasOpen && isCritical);
+  }
+
   if (warn) {
-    if (missing.count > 0) {
+    if (hasMissing) {
       const n = missing.count;
       const hLabel = formatHours(missing.hours);
       warn.innerHTML =
@@ -2492,26 +2903,51 @@ function renderDashOpenBlock(stats) {
   if (!sites.length) {
     body.innerHTML =
       '<tr><td colspan="4" style="color:var(--t3);padding:18px 10px;">Keine offenen verrechenbaren Stunden.</td></tr>';
+    if (cards) {
+      cards.innerHTML =
+        '<div class="dash-open-empty">Keine offenen verrechenbaren Stunden.</div>';
+    }
     return;
   }
 
   const rows = [];
+  const cardRows = [];
   for (const s of sites) {
     const stale = Number(s.ageDays) > 21;
+    const missingAmt = s.missingRateCount > 0;
+    const amountLabel =
+      missingAmt && !(Number(s.amount) > 0)
+        ? 'Ansatz fehlt'
+        : missingAmt
+          ? `CHF ${formatSwissChf(s.amount)} (+ fehlt)`
+          : `CHF ${formatSwissChf(s.amount)}`;
     const amountCell =
-      s.missingRateCount > 0 && !(Number(s.amount) > 0)
-        ? '<span style="color:var(--saniga-red);font-weight:600;">Ansatz fehlt</span>'
-        : s.missingRateCount > 0
+      missingAmt && !(Number(s.amount) > 0)
+        ? '<span style="color:var(--red);font-weight:600;">Ansatz fehlt</span>'
+        : missingAmt
           ? `CHF ${escapeAttr(formatSwissChf(s.amount))} <span style="color:var(--t3);font-size:11px;">(+ Ansatz fehlt)</span>`
           : `CHF ${escapeAttr(formatSwissChf(s.amount))}`;
+    const cardTone = stale ? ' is-stale' : missingAmt ? ' is-missing' : '';
     rows.push(`<tr class="${stale ? 'dash-open-stale' : ''}">
       <td><strong>${escapeAttr(s.customerName)}</strong><div style="color:var(--t3);font-size:12px;margin-top:2px;">${escapeAttr(s.siteLabel)}</div></td>
       <td class="mono">${escapeAttr(formatHours(s.hours))}</td>
       <td>${amountCell}</td>
       <td><span class="dash-open-age ${stale ? 'stale' : ''}">${escapeAttr(String(s.ageDays))} Tage</span><div style="color:var(--t3);font-size:11px;margin-top:2px;">seit ${escapeAttr(IsoWeek.formatDe(s.oldestDate))}</div></td>
     </tr>`);
+    cardRows.push(`<button type="button" class="dash-open-card${cardTone}" onclick="openRapporteOpenHours()">
+      <div class="dash-open-card-top">
+        <div class="dash-open-card-cust">${escapeAttr(s.customerName || 'Kunde')}</div>
+        <div class="dash-open-card-hrs">${escapeAttr(formatHours(s.hours))}</div>
+      </div>
+      <div class="dash-open-card-site">${escapeAttr(s.siteLabel || 'Objekt')}</div>
+      <div class="dash-open-card-meta">
+        <span>${escapeAttr(amountLabel)}</span>
+        <span class="${stale ? 'stale' : ''}">${escapeAttr(String(s.ageDays))} Tg · seit ${escapeAttr(IsoWeek.formatDe(s.oldestDate))}</span>
+      </div>
+    </button>`);
   }
   body.innerHTML = rows.join('');
+  if (cards) cards.innerHTML = cardRows.join('');
 }
 
 async function renderDash() {
@@ -2587,6 +3023,7 @@ async function renderDash() {
 function renderTeamProfile() {
   const ph = document.getElementById('teamProfPlaceholder');
   const body = document.getElementById('teamProfBody');
+  const titleEl = document.querySelector('#view-team .team-detail-title');
   if (!ph || !body) return;
   const list = trackedEmps();
   const e = teamSelEmpId != null ? ge(teamSelEmpId) : null;
@@ -2594,6 +3031,7 @@ function renderTeamProfile() {
   if (!valid) {
     ph.style.display = '';
     body.style.display = 'none';
+    if (titleEl) titleEl.textContent = 'Profil';
     return;
   }
   ph.style.display = 'none';
@@ -2606,6 +3044,7 @@ function renderTeamProfile() {
   av.style.background = e.color;
   av.style.color = 'white';
   document.getElementById('teamProfName').textContent = `${e.first} ${e.last}`;
+  if (titleEl) titleEl.textContent = `${e.first} ${e.last}`;
   document.getElementById('teamProfRole').textContent = e.role;
   document.getElementById('teamProfId').textContent = `#${e.id}`;
   document.getElementById('teamProfRate').textContent = `CHF ${e.rate}.–/h`;
@@ -2626,12 +3065,32 @@ function renderTeamProfile() {
     : '<div style="color:var(--t3);font-size:12px;padding:8px 0;">Keine Einträge in diesem Monat.</div>';
 }
 
+function isPhoneLayout() {
+  return window.matchMedia('(max-width: 767px)').matches;
+}
+
+function openTeamDetailSheet() {
+  document.body.classList.add('team-detail-open');
+}
+
+function closeTeamDetail() {
+  document.body.classList.remove('team-detail-open');
+  if (isPhoneLayout()) {
+    teamSelEmpId = null;
+    document.querySelectorAll('#teamGrid .team-emp-pick').forEach((el) => {
+      el.classList.remove('is-selected');
+    });
+    renderTeamProfile();
+  }
+}
+
 function openTeamProfile(id) {
   teamSelEmpId = id;
   document.querySelectorAll('#teamGrid .team-emp-pick').forEach((el) => {
     el.classList.toggle('is-selected', el.dataset.emp === String(id));
   });
   renderTeamProfile();
+  if (isPhoneLayout()) openTeamDetailSheet();
 }
 
 async function deleteTeamEmployee() {
@@ -2644,6 +3103,7 @@ async function deleteTeamEmployee() {
   try {
     await api(`/employees/${delId}`, { method: 'DELETE' });
     teamSelEmpId = null;
+    closeTeamDetail();
     await loadData();
     if (wasCur) curUser = EMPS.length ? EMPS[0].id : ME.id;
     fillUserSwitcher();
@@ -2659,7 +3119,10 @@ function renderTeam() {
   const grid = document.getElementById('teamGrid');
   if (!grid) return;
   const list = trackedEmps();
-  if (teamSelEmpId != null && !list.some((e) => e.id === teamSelEmpId)) teamSelEmpId = null;
+  if (teamSelEmpId != null && !list.some((e) => e.id === teamSelEmpId)) {
+    teamSelEmpId = null;
+    closeTeamDetail();
+  }
   const m = teamProfileMonth();
   const mLabel = monthGermanLabel(m);
   const monOnly = MOS[+m.split('-')[1]];
@@ -2694,6 +3157,7 @@ function renderTeam() {
           <div style="font-weight:700;font-size:13px;">${e.target}h</div>
         </div>
       </div>
+      <span class="team-emp-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg></span>
     </div>`;
     })
     .join('');
@@ -2710,6 +3174,7 @@ function renderTeam() {
     }
   };
   renderTeamProfile();
+  if (isPhoneLayout() && !teamSelEmpId) closeTeamDetail();
 }
 
 const PAYROLL_STORAGE_KEY = 'saniga_payroll_v1';
@@ -3623,8 +4088,10 @@ function initAfterLogin() {
   syncSidebarFromCur();
   tick();
   bindMobileBottomNav();
+  bindAdminMoreSheet();
   bindInstantTaps();
   activeViewName = '';
+  renderMobileBottomNav();
   showView(IS_ADMIN ? 'dashboard' : 'meine');
   startEntrySync();
 }
@@ -3687,5 +4154,7 @@ const profilLogoutBtn = document.getElementById('profilLogoutBtn');
 if (profilLogoutBtn) profilLogoutBtn.addEventListener('click', doLogout);
 
 bindMobileBottomNav();
+bindAdminMoreSheet();
 bindInstantTaps();
+renderMobileBottomNav();
 trySession();
