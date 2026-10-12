@@ -27,7 +27,7 @@ let entriesFingerprint = '';
 let masterFingerprint = '';
 let suppressRemoteToastUntil = 0;
 let syncInFlight = false;
-const ENTRY_SYNC_MS = 30000;
+const ENTRY_SYNC_MS = 15000;
 
 const MOS = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
@@ -47,6 +47,8 @@ async function api(path, opts = {}) {
   if (t) headers.Authorization = `Bearer ${t}`;
   const r = await fetch(`/api${path}`, {
     ...opts,
+    // Always hit the server — PWA/Safari must not reuse stale Stammdaten GETs.
+    cache: opts.cache || 'no-store',
     headers,
     body: opts.body !== undefined ? opts.body : undefined,
   });
@@ -168,10 +170,33 @@ async function fetchMasterData() {
   return changed;
 }
 
+/** Rebuild open entry/absence dropdowns from current CUSTOMERS/SITES/WORK_TYPES. */
+function refreshOpenMasterSelects() {
+  const entryOpen = document.getElementById('moEntry')?.classList.contains('open');
+  if (entryOpen) {
+    fillEntrySiteSelect();
+    fillEntryWorkTypeSelect();
+  }
+  const absOpen = document.getElementById('moAbsence')?.classList.contains('open');
+  if (absOpen) {
+    const typeSel = document.getElementById('absType');
+    if (typeSel) {
+      const keep = typeSel.value;
+      const types = absenceTypesSorted();
+      typeSel.innerHTML = types
+        .map((w) => `<option value="${escapeAttr(w.id)}">${escapeAttr(w.label)}</option>`)
+        .join('');
+      if (keep && types.some((w) => w.id === keep)) typeSel.value = keep;
+    }
+  }
+}
+
 /**
  * Re-apply master data to the active view without wiping half-edited Stammdaten forms.
  */
 function applyMasterDataRefresh() {
+  refreshOpenMasterSelects();
+
   const view = document.querySelector('.view.active');
   const n = view ? view.id.replace('view-', '') : '';
   if (n === 'alle') {
@@ -190,6 +215,10 @@ function applyMasterDataRefresh() {
   }
   if (n === 'profil') {
     renderProfil();
+  }
+  if (n === 'meine' || n === 'monat') {
+    // Entry lists don't embed site catalogs; dropdowns are refreshed above when open.
+    return;
   }
   if (n === 'stammdaten' && IS_ADMIN) {
     const editing = document.querySelector(
@@ -230,8 +259,7 @@ function notifyEntrySync(prev, next) {
 
 async function pollRemoteEntries() {
   if (!ME || syncInFlight) return;
-  // Skip while a modal is open so half-filled forms / dropdowns are not rebuilt mid-edit.
-  if (document.querySelector('.mo.open')) return;
+  const modalOpen = Boolean(document.querySelector('.mo.open'));
   syncInFlight = true;
   try {
     let masterChanged = false;
@@ -240,6 +268,14 @@ async function pollRemoteEntries() {
     } catch {
       /* keep cached master data */
     }
+
+    // Always push fresh Stammdaten into open dropdowns (Kunde/Objekt/Arbeitsart).
+    if (masterChanged) {
+      applyMasterDataRefresh();
+    }
+
+    // Skip entry-list sync while a sheet is open so half-filled forms are not wiped.
+    if (modalOpen) return;
 
     const entRes = await api('/time-entries?from=2020-01-01&to=2030-12-31');
     const next = entRes.entries.map(mapEntry);
@@ -266,8 +302,6 @@ async function pollRemoteEntries() {
       entriesFingerprint = fp;
       if (allowToast) notifyEntrySync(prev, next);
       refreshCur();
-    } else if (masterChanged) {
-      applyMasterDataRefresh();
     }
   } catch {
     /* ignore transient network errors */
@@ -454,16 +488,16 @@ function entryActionButtonsHtml(en) {
   const id = escapeAttr(en.id);
   return `<div class="entry-acts">
     <div class="entry-acts-icons">
-      <button type="button" class="ib" onclick="openEdit('${id}')" title="Bearbeiten" aria-label="Bearbeiten">
+      <button type="button" class="ib" data-action="edit-entry" data-id="${id}" title="Bearbeiten" aria-label="Bearbeiten">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </button>
-      <button type="button" class="ib del" onclick="quickDel('${id}')" title="Löschen" aria-label="Löschen">
+      <button type="button" class="ib del" data-action="del-entry" data-id="${id}" title="Löschen" aria-label="Löschen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
       </button>
     </div>
     <div class="entry-acts-btns">
-      <button type="button" class="btn btn-g" onclick="openEdit('${id}')">Bearbeiten</button>
-      <button type="button" class="btn btn-d" onclick="quickDel('${id}')">Löschen</button>
+      <button type="button" class="btn btn-g" data-action="edit-entry" data-id="${id}">Bearbeiten</button>
+      <button type="button" class="btn btn-d" data-action="del-entry" data-id="${id}">Löschen</button>
     </div>
   </div>`;
 }
@@ -600,6 +634,7 @@ function showView(n) {
     return;
   }
   activeViewName = n;
+  // Paint tab chrome immediately — defer list rebuild so the press feels native.
   document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
   const el = document.getElementById(`view-${n}`);
   if (el) el.classList.add('active');
@@ -609,8 +644,17 @@ function showView(n) {
   const titleEl = document.getElementById('topTitle');
   if (titleEl) titleEl.textContent = TITLES[n] || '';
   syncMobileChrome(n);
-  if (n === 'profil') renderProfil();
-  else refreshView(n);
+
+  const run = () => {
+    if (activeViewName !== n) return;
+    if (n === 'profil') renderProfil();
+    else refreshView(n);
+  };
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => requestAnimationFrame(run));
+  } else {
+    setTimeout(run, 0);
+  }
 }
 
 /** Instant bottom-nav response on iPhone (pointerdown, no click delay / swallowed first tap). */
@@ -659,6 +703,68 @@ function bindMobileBottomNav() {
     const view = btn.getAttribute('data-view') || '';
     if (view && view === lastPointerView && Date.now() - lastPointerAt < 450) return;
     go(btn);
+  });
+}
+
+/**
+ * Instant press handling for FAB, week days, edit/delete — same feel as bottom nav.
+ * Uses pointerdown + suppresses the delayed iOS click.
+ */
+function bindInstantTaps() {
+  const root = document.getElementById('mainApp');
+  if (!root || root.dataset.instantTaps === '1') return;
+  root.dataset.instantTaps = '1';
+
+  let lastKey = '';
+  let lastAt = 0;
+
+  function runAction(el) {
+    if (!el || el.disabled) return false;
+    const action = el.getAttribute('data-action');
+    if (!action) return false;
+    el.classList.add('is-pressed');
+    if (action === 'add-hours') openAdd();
+    else if (action === 'add-date') openAddDate(el.getAttribute('data-date') || today());
+    else if (action === 'add-absence') openAbsenceDialog();
+    else if (action === 'edit-entry') openEdit(el.getAttribute('data-id'));
+    else if (action === 'del-entry') quickDel(el.getAttribute('data-id'));
+    else if (action === 'del-absence') deleteAbsenceGroup(el.getAttribute('data-id'));
+    else return false;
+    return true;
+  }
+
+  root.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const el = e.target.closest('[data-action]');
+      if (!el || !root.contains(el) || el.disabled) return;
+      if (el.closest('.mbnav-item')) return; // bottom nav has its own handler
+      if (!runAction(el)) return;
+      lastKey = `${el.getAttribute('data-action')}:${el.getAttribute('data-id') || el.getAttribute('data-date') || ''}`;
+      lastAt = Date.now();
+      e.preventDefault();
+    },
+    { passive: false }
+  );
+
+  const clearPressed = () => {
+    root.querySelectorAll('.is-pressed').forEach((b) => b.classList.remove('is-pressed'));
+  };
+  root.addEventListener('pointerup', clearPressed);
+  root.addEventListener('pointercancel', clearPressed);
+
+  root.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el || !root.contains(el) || el.disabled) return;
+    if (el.closest('.mbnav-item')) return;
+    const key = `${el.getAttribute('data-action')}:${el.getAttribute('data-id') || el.getAttribute('data-date') || ''}`;
+    if (key === lastKey && Date.now() - lastAt < 450) {
+      e.preventDefault();
+      return;
+    }
+    e.preventDefault();
+    runAction(el);
   });
 }
 
@@ -1096,6 +1202,18 @@ async function renderAbsenzenMine() {
   const cards = document.getElementById('absMineCards');
   const count = document.getElementById('absMineCount');
   if (!body) return;
+  const emptyNow =
+    !body.innerHTML.trim() ||
+    body.querySelector('.rp-empty') ||
+    (cards && !cards.innerHTML.trim());
+  if (emptyNow) {
+    const loading =
+      '<div class="rp-empty" style="box-shadow:none;border:none;">Lade Absenzen…</div>';
+    if (!body.innerHTML.trim() || body.querySelector('.rp-empty')) body.innerHTML = loading;
+    if (cards && (!cards.innerHTML.trim() || cards.querySelector('.rp-empty'))) {
+      cards.innerHTML = loading;
+    }
+  }
   try {
     const res = await api('/absences');
     const groups = res.groups || [];
@@ -1123,7 +1241,7 @@ async function renderAbsenzenMine() {
             <td class="mono">${escapeAttr(String(g.days))}</td>
             <td class="mono">${escapeAttr(formatHours(g.hours))}</td>
             <td style="color:var(--t2);font-size:13px;">${escapeAttr(g.note || '—')}</td>
-            <td><button type="button" class="btn btn-d" onclick="deleteAbsenceGroup('${escapeAttr(g.groupId)}')">Löschen</button></td>
+            <td><button type="button" class="btn btn-d" data-action="del-absence" data-id="${escapeAttr(g.groupId)}">Löschen</button></td>
           </tr>`;
         })
         .join('')}</tbody></table>`;
@@ -1142,7 +1260,7 @@ async function renderAbsenzenMine() {
             <div class="m-card-mid">${escapeAttr(g.workTypeLabel)} · ${escapeAttr(String(g.days))} Tage</div>
             <div class="m-card-note">${escapeAttr(g.note || '—')}</div>
             <div class="m-card-acts">
-              <button type="button" class="btn btn-d" onclick="deleteAbsenceGroup('${escapeAttr(g.groupId)}')">Löschen</button>
+              <button type="button" class="btn btn-d" data-action="del-absence" data-id="${escapeAttr(g.groupId)}">Löschen</button>
             </div>
           </div>`;
         })
@@ -1232,23 +1350,16 @@ function showAbsErr(msg) {
   }
 }
 
-async function openAbsenceDialog() {
-  showAbsErr('');
-  try {
-    await ensureEntryMasterData();
-  } catch (e) {
-    toast(e.message);
-    return;
-  }
+function fillAbsenceDialogFields() {
   const types = absenceTypesSorted();
   const typeSel = document.getElementById('absType');
-  if (!types.length) {
-    toast('Keine Absenz-Arten vorhanden.');
-    return;
-  }
+  if (!typeSel) return false;
+  if (!types.length) return false;
+  const keep = typeSel.value;
   typeSel.innerHTML = types
     .map((w) => `<option value="${escapeAttr(w.id)}">${escapeAttr(w.label)}</option>`)
     .join('');
+  if (keep && types.some((w) => w.id === keep)) typeSel.value = keep;
   const empFg = document.getElementById('absEmpFg');
   const empSel = document.getElementById('absEmp');
   if (IS_ADMIN) {
@@ -1260,12 +1371,37 @@ async function openAbsenceDialog() {
   } else {
     empFg.classList.add('hidden');
   }
+  return true;
+}
+
+function openAbsenceDialog() {
+  showAbsErr('');
   const t = today();
   document.getElementById('absFrom').value = t;
   document.getElementById('absTo').value = t;
   document.getElementById('absHalfDay').checked = false;
   document.getElementById('absNote').value = '';
+
+  // Open immediately with cached types — refresh Stammdaten in background.
+  if (!fillAbsenceDialogFields()) {
+    ensureEntryMasterData()
+      .then(() => {
+        if (!fillAbsenceDialogFields()) {
+          toast('Keine Absenz-Arten vorhanden.');
+          return;
+        }
+        openAbsenceSheet();
+      })
+      .catch((e) => toast(e.message || 'Absenz-Arten konnten nicht geladen werden.'));
+    return;
+  }
   openAbsenceSheet();
+  ensureEntryMasterData()
+    .then(() => {
+      if (!document.getElementById('moAbsence')?.classList.contains('open')) return;
+      fillAbsenceDialogFields();
+    })
+    .catch(() => {});
 }
 
 async function saveAbsence() {
@@ -2188,7 +2324,7 @@ function renderMeine() {
   if (!wEntries.length) {
     list.innerHTML = `<div style="padding:24px 20px;text-align:center;color:var(--t3);font-size:13px;">
       Noch keine Einträge diese Woche.<br>
-      <span style="color:var(--saniga-red);cursor:pointer;font-weight:600;" onclick="openAdd()">Jetzt eintragen →</span>
+      <span style="color:var(--saniga-red);cursor:pointer;font-weight:600;" data-action="add-hours" role="button" tabindex="0">Jetzt eintragen →</span>
     </div>`;
     return;
   }
@@ -2244,7 +2380,7 @@ function renderWeekStrip() {
     .map((d, i) => {
       const mins = ENTRIES.filter((e) => e.empId === curUser && e.date === d).reduce((s, e) => s + net(e), 0);
       const isT = d === t;
-      return `<div class="wd ${isT ? 'today' : ''} ${mins > 0 ? 'has-entry' : ''}" onclick="openAddDate('${d}')">
+      return `<div class="wd ${isT ? 'today' : ''} ${mins > 0 ? 'has-entry' : ''}" data-action="add-date" data-date="${escapeAttr(d)}" role="button" tabindex="0">
       <div class="wd-n">${ns[i]}</div>
       <div class="wd-d">${parseInt(d.split('-')[2], 10)}</div>
       <div class="wd-h" style="color:${mins > 0 ? 'var(--green)' : 'var(--t4)'};">${mins > 0 ? mDur(mins) : '–'}</div>
@@ -2891,7 +3027,9 @@ function showEntryErr(msg) {
 
 /** Always fetch current sites/work types (and customers) before entry dropdowns are shown. */
 async function ensureEntryMasterData() {
-  await fetchMasterData();
+  const changed = await fetchMasterData();
+  if (changed) applyMasterDataRefresh();
+  return changed;
 }
 
 function siteOptionLabel(s, { inactive = false } = {}) {
@@ -3009,7 +3147,7 @@ function calcPreview() {
   });
 }
 
-async function openAdd(date) {
+function openAdd(date) {
   if (IS_ADMIN && !EMPS.length) {
     toast('Bitte zuerst unter «Team verwalten» eine Person anlegen.');
     return;
@@ -3024,21 +3162,28 @@ async function openAdd(date) {
   document.getElementById('eHours').value = '8';
   document.getElementById('eNote').value = '';
   document.getElementById('eDel').style.display = 'none';
-  try {
-    await ensureEntryMasterData();
-    fillEntrySiteSelect('');
-    fillEntryWorkTypeSelect('');
-  } catch (e) {
-    showEntryErr(e.message);
-  }
+  // Instant open with cached Stammdaten — refresh selects after network returns.
+  fillEntrySiteSelect('');
+  fillEntryWorkTypeSelect('');
   openEntrySheet();
+  ensureEntryMasterData()
+    .then(() => {
+      if (editId != null) return;
+      if (!document.getElementById('moEntry')?.classList.contains('open')) return;
+      fillEntrySiteSelect();
+      fillEntryWorkTypeSelect();
+    })
+    .catch((e) => {
+      if (editId != null) return;
+      showEntryErr(e.message || 'Stammdaten konnten nicht geladen werden.');
+    });
 }
 
 function openAddDate(d) {
   openAdd(d);
 }
 
-async function openEdit(id) {
+function openEdit(id) {
   const en = ENTRIES.find((e) => e.id === id);
   if (!en) return;
   if (isAbsenceEntry(en)) {
@@ -3061,14 +3206,20 @@ async function openEdit(id) {
   );
   document.getElementById('eNote').value = en.note || '';
   document.getElementById('eDel').style.display = '';
-  try {
-    await ensureEntryMasterData();
-    fillEntrySiteSelect(en.siteId || '');
-    fillEntryWorkTypeSelect(en.workTypeId || '');
-  } catch (e) {
-    showEntryErr(e.message);
-  }
+  fillEntrySiteSelect(en.siteId || '');
+  fillEntryWorkTypeSelect(en.workTypeId || '');
   openEntrySheet();
+  ensureEntryMasterData()
+    .then(() => {
+      if (editId !== id) return;
+      if (!document.getElementById('moEntry')?.classList.contains('open')) return;
+      fillEntrySiteSelect(en.siteId || '');
+      fillEntryWorkTypeSelect(en.workTypeId || '');
+    })
+    .catch((e) => {
+      if (editId !== id) return;
+      showEntryErr(e.message || 'Stammdaten konnten nicht geladen werden.');
+    });
 }
 
 function collectEntryForm() {
@@ -3472,6 +3623,7 @@ function initAfterLogin() {
   syncSidebarFromCur();
   tick();
   bindMobileBottomNav();
+  bindInstantTaps();
   activeViewName = '';
   showView(IS_ADMIN ? 'dashboard' : 'meine');
   startEntrySync();
@@ -3481,6 +3633,10 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && ME) {
     pollRemoteEntries();
   }
+});
+
+window.addEventListener('focus', () => {
+  if (ME) pollRemoteEntries();
 });
 
 async function doLogin() {
@@ -3531,4 +3687,5 @@ const profilLogoutBtn = document.getElementById('profilLogoutBtn');
 if (profilLogoutBtn) profilLogoutBtn.addEventListener('click', doLogout);
 
 bindMobileBottomNav();
+bindInstantTaps();
 trySession();

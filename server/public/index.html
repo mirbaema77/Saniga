@@ -664,7 +664,25 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     display: flex;
     pointer-events: auto;
   }
-  .mobile-fab svg { width: 20px; height: 20px; }
+  .mobile-fab svg { width: 20px; height: 20px; pointer-events: none; }
+  .mobile-fab.is-pressed,
+  .mobile-fab:active {
+    transform: scale(0.98);
+    filter: brightness(0.96);
+  }
+  .wd.is-pressed,
+  .wd:active {
+    background: rgba(18,184,225,.14);
+  }
+  .btn.is-pressed,
+  .ib.is-pressed {
+    filter: brightness(0.94);
+    transform: scale(0.98);
+  }
+  /* Snappier view switches on phone — skip fade delay */
+  .view { animation: none; }
+  .mo { transition: opacity .12s; backdrop-filter: none; }
+  .mo-box { transition: none; transform: none; }
   #view-meine .quick-add { display: none; }
   body.mobile-meine-open .content {
     padding-bottom: calc(var(--mnav-h) + var(--mfab-h) + var(--mfab-gap) + 20px);
@@ -1666,7 +1684,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     <!-- ═══ ABSENZEN ═══ -->
     <div class="view" id="view-absenzen">
       <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:20px;">
-        <button type="button" class="btn btn-p" onclick="openAbsenceDialog()">Absenz erfassen</button>
+        <button type="button" class="btn btn-p" data-action="add-absence">Absenz erfassen</button>
       </div>
       <p style="font-size:13px;color:var(--t2);margin:0 0 14px;line-height:1.45;">
         Ferien und andere Absenzen als Zeitraum erfassen. Samstage und Sonntage werden übersprungen.
@@ -1952,7 +1970,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     <span class="mbnav-lbl">Profil</span>
   </button>
 </nav>
-<button type="button" class="mobile-fab" id="mobileFab" onclick="openAdd()">
+<button type="button" class="mobile-fab" id="mobileFab" data-action="add-hours">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   Stunden erfassen
 </button>

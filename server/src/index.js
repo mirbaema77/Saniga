@@ -59,6 +59,10 @@ app.use(
 app.use(express.json({ limit: '1mb' }));
 
 app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
+  }
   const originalJson = res.json.bind(res);
   res.json = (body) => {
     res.set('Content-Type', 'application/json; charset=utf-8');
@@ -91,6 +95,9 @@ app.use(
     setHeaders(res, filePath) {
       if (filePath.endsWith('.html')) {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+      } else if (filePath.endsWith('.js') || filePath.endsWith('.webmanifest')) {
+        res.setHeader('Cache-Control', 'no-store');
       }
     },
   })
