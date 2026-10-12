@@ -94,6 +94,19 @@ const admin = {
   avatarColor: '#12B8E1',
 };
 
+const worker = {
+  id: 'emp-2',
+  email: 'marco@test.local',
+  role: 'EMPLOYEE',
+  firstName: 'Marco',
+  lastName: 'Huber',
+  jobTitle: 'Monteur Sanitär',
+  hourlyRate: 35,
+  weeklyHours: 45,
+  isTimeTracked: true,
+  avatarColor: '#0d9488',
+};
+
 const customers = [
   {
     id: 'cust-1',
@@ -290,7 +303,7 @@ app.patch('/api/work-types/:id', (req, res) => {
   if (req.body.active != null) w.active = !!req.body.active;
   res.json({ workType: w });
 });
-app.get('/api/employees', (_req, res) => res.json({ employees: [admin] }));
+app.get('/api/employees', (_req, res) => res.json({ employees: [admin, worker] }));
 app.get('/api/company', (_req, res) =>
   res.json({
     company: {
@@ -335,33 +348,38 @@ app.get('/api/dashboard', (_req, res) =>
     isoWeek: 1,
   })
 );
-app.get('/api/dashboard/open', (_req, res) =>
-  res.json({
-    totalHours: 18.5,
-    totalAmount: 1295,
-    missingRate: { count: 1, hours: 2 },
-    sites: [
-      {
-        customerName: 'Muster AG',
-        siteLabel: 'Baustelle Hinwil',
-        hours: 12,
-        amount: 840,
-        ageDays: 9,
-        oldestDate: '2026-10-01',
-        missingRateCount: 0,
-      },
-      {
-        customerName: 'Beispiel GmbH',
-        siteLabel: 'Sanierung Dach',
-        hours: 6.5,
-        amount: 0,
-        ageDays: 28,
-        oldestDate: '2026-09-12',
-        missingRateCount: 2,
-      },
-    ],
-  })
-);
+app.get('/api/dashboard/open', (req, res) => {
+  const userId = typeof req.query.userId === 'string' ? req.query.userId.trim() : '';
+  const allSites = [
+    {
+      customerName: 'Muster AG',
+      siteLabel: 'Baustelle Hinwil',
+      hours: 12,
+      amount: 840,
+      ageDays: 9,
+      oldestDate: '2026-10-01',
+      missingRateCount: 0,
+    },
+    {
+      customerName: 'Beispiel GmbH',
+      siteLabel: 'Sanierung Dach',
+      hours: 6.5,
+      amount: 0,
+      ageDays: 28,
+      oldestDate: '2026-09-12',
+      missingRateCount: 2,
+    },
+  ];
+  // Mock: Alle = full open set; a specific person = first site only (demo filter).
+  const sites = userId && userId !== admin.id ? [allSites[0]] : allSites;
+  const totalHours = sites.reduce((s, r) => s + r.hours, 0);
+  const totalAmount = sites.reduce((s, r) => s + r.amount, 0);
+  const missingRate = {
+    count: sites.reduce((s, r) => s + (r.missingRateCount || 0), 0),
+    hours: sites.reduce((s, r) => s + (r.missingRateCount ? r.hours : 0), 0),
+  };
+  res.json({ totalHours, totalAmount, missingRate, sites });
+});
 app.get('/api/reports', (_req, res) => res.json({ customers: reportCustomers }));
 app.get('/api/invoices', (_req, res) => res.json({ invoices }));
 

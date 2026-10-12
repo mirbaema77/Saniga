@@ -431,30 +431,30 @@ function renderMobileBottomNav() {
   if (!nav) return;
   const cur = activeViewName || (IS_ADMIN ? 'dashboard' : 'meine');
   if (IS_ADMIN) {
-    const mehrActive = ADMIN_MEHR_VIEWS.has(cur);
+    const mehrActive = cur === 'mehr' || ADMIN_MEHR_VIEWS.has(cur);
     nav.innerHTML =
       mbnavBtn(
         'dashboard',
         'Home',
-        '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+        '<path d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5z"/>',
         { active: cur === 'dashboard' }
       ) +
       mbnavBtn(
         'team',
         'Team',
-        '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+        '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3.5"/><path d="M22 21v-2a3.5 3.5 0 0 0-2.5-3.35"/><path d="M16.5 3.7a3.5 3.5 0 0 1 0 6.6"/>',
         { active: cur === 'team' }
       ) +
       mbnavBtn(
         'rapporte',
         'Rapporte',
-        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
+        '<path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h4"/>',
         { active: cur === 'rapporte' }
       ) +
       mbnavBtn(
         'mehr',
         'Mehr',
-        '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+        '<circle cx="6" cy="12" r="1.35"/><circle cx="12" cy="12" r="1.35"/><circle cx="18" cy="12" r="1.35"/>',
         { active: mehrActive }
       );
   } else {
@@ -486,33 +486,8 @@ function renderMobileBottomNav() {
   }
 }
 
-function openAdminMoreSheet() {
-  const sheet = document.getElementById('moAdminMore');
-  if (!sheet) return;
-  sheet.classList.add('open');
-  sheet.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('admin-more-open');
-  document.querySelectorAll('#mobileBottomNav .mbnav-item').forEach((btn) => {
-    btn.classList.toggle('active', btn.getAttribute('data-view') === 'mehr');
-  });
-}
-
-function closeAdminMoreSheet() {
-  const sheet = document.getElementById('moAdminMore');
-  if (!sheet) return;
-  sheet.classList.remove('open');
-  sheet.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('admin-more-open');
-  syncMobileChrome(activeViewName || 'dashboard');
-}
-
 function pickAdminMoreView(view) {
-  if (!view) {
-    closeAdminMoreSheet();
-    return;
-  }
-  // Navigate first so the destination paints, then close the sheet.
-  closeAdminMoreSheet();
+  if (!view) return;
   showView(view);
 }
 
@@ -726,6 +701,7 @@ const TITLES = {
   // lohn: 'Lohnabrechnung', // hidden — external Treuhänder
   alle: 'Alle Einträge',
   rapporte: 'Rapporte',
+  mehr: 'Mehr',
   rechnungen: 'Rechnungen',
   stundenexport: 'Stundenexport',
   absenzen: 'Absenzen',
@@ -735,12 +711,12 @@ const TITLES = {
 let activeViewName = '';
 
 function syncMobileChrome(n) {
-  const mehrOpen = document.getElementById('moAdminMore')?.classList.contains('open');
   document.querySelectorAll('#mobileBottomNav .mbnav-item').forEach((btn) => {
     const v = btn.getAttribute('data-view');
     let on = v === n;
     if (IS_ADMIN && v === 'mehr') {
-      on = mehrOpen || ADMIN_MEHR_VIEWS.has(n);
+      // Hub page or any destination opened from Mehr
+      on = n === 'mehr' || ADMIN_MEHR_VIEWS.has(n);
     }
     btn.classList.toggle('active', on);
   });
@@ -763,7 +739,6 @@ function syncMobileChrome(n) {
 
 function showView(n) {
   if (!n) return;
-  if (n !== 'mehr') closeAdminMoreSheet();
   if (n !== 'team') closeTeamDetail();
   if (n !== 'stammdaten') closeSdEditSheet();
   if (n !== 'rapporte') closeRpFilterSheet();
@@ -851,12 +826,6 @@ function bindMobileBottomNav() {
     lastPointerAt = now;
     clearPressed();
     btn.classList.add('is-pressed');
-    if (view === 'mehr') {
-      if (document.getElementById('moAdminMore')?.classList.contains('open')) closeAdminMoreSheet();
-      else openAdminMoreSheet();
-      return true;
-    }
-    closeAdminMoreSheet();
     showView(view);
     return true;
   }
@@ -912,24 +881,14 @@ function bindMobileBottomNav() {
   });
 }
 
-function bindAdminMoreSheet() {
-  const sheet = document.getElementById('moAdminMore');
-  if (!sheet || sheet.dataset.bound === '1') return;
-  sheet.dataset.bound = '1';
-
-  const closeBtn = document.getElementById('adminMoreClose');
-  if (closeBtn) closeBtn.addEventListener('click', () => closeAdminMoreSheet());
-
-  sheet.addEventListener('click', (e) => {
-    if (e.target === sheet) closeAdminMoreSheet();
-  });
+function bindAdminMorePage() {
+  const page = document.getElementById('view-mehr');
+  if (!page || page.dataset.bound === '1') return;
+  page.dataset.bound = '1';
 
   const logoutBtn = document.getElementById('adminMoreLogout');
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
-      closeAdminMoreSheet();
-      doLogout();
-    });
+    logoutBtn.addEventListener('click', () => doLogout());
   }
 
   let lastKey = '';
@@ -939,12 +898,12 @@ function bindAdminMoreSheet() {
   let pressY = 0;
   let pressId = null;
 
-  sheet.addEventListener(
+  page.addEventListener(
     'pointerdown',
     (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const item = e.target.closest('[data-more-view]');
-      if (!item || !sheet.contains(item)) return;
+      if (!item || !page.contains(item)) return;
       pressItem = item;
       pressX = e.clientX;
       pressY = e.clientY;
@@ -961,9 +920,8 @@ function bindAdminMoreSheet() {
     const dy = Math.abs((e.clientY || 0) - pressY);
     pressItem = null;
     pressId = null;
-    sheet.querySelectorAll('.is-pressed').forEach((b) => b.classList.remove('is-pressed'));
+    page.querySelectorAll('.is-pressed').forEach((b) => b.classList.remove('is-pressed'));
     if (!commit || !item) return;
-    // Allow list scrolling — only treat as tap if finger barely moved
     if (dx > 12 || dy > 12) return;
     const view = item.getAttribute('data-more-view');
     if (!view) return;
@@ -973,12 +931,12 @@ function bindAdminMoreSheet() {
     pickAdminMoreView(view);
   }
 
-  sheet.addEventListener('pointerup', (e) => endMorePress(e, true), { passive: false });
-  sheet.addEventListener('pointercancel', (e) => endMorePress(e, false));
+  page.addEventListener('pointerup', (e) => endMorePress(e, true), { passive: false });
+  page.addEventListener('pointercancel', (e) => endMorePress(e, false));
 
-  sheet.addEventListener('click', (e) => {
+  page.addEventListener('click', (e) => {
     const item = e.target.closest('[data-more-view]');
-    if (!item || !sheet.contains(item)) return;
+    if (!item || !page.contains(item)) return;
     const view = item.getAttribute('data-more-view') || '';
     if (view && view === lastKey && Date.now() - lastAt < 450) {
       e.preventDefault();
@@ -3098,13 +3056,82 @@ function renderDashOpenBlock(stats) {
   if (cards) cards.innerHTML = cardRows.join('');
 }
 
+/** Phone Home filters (session). '' = Alle; period = week | month. */
+let dashFilterEmpId = '';
+let dashFilterPeriod = 'week';
+
+function dashScopeTeam() {
+  const all = trackedEmps();
+  if (!dashFilterEmpId) return all;
+  const one = all.find((e) => e.id === dashFilterEmpId);
+  return one ? [one] : all;
+}
+
+function fillDashEmpFilter() {
+  const sel = document.getElementById('dashEmpFilter');
+  if (!sel) return;
+  const prev = dashFilterEmpId;
+  sel.innerHTML =
+    `<option value="">Alle</option>` +
+    trackedEmps()
+      .map(
+        (e) =>
+          `<option value="${escapeAttr(e.id)}">${escapeAttr(e.first)} ${escapeAttr(e.last)}</option>`
+      )
+      .join('');
+  sel.value = [...sel.options].some((o) => o.value === prev) ? prev : '';
+  dashFilterEmpId = sel.value || '';
+}
+
+function syncDashFilterChrome() {
+  const bar = document.getElementById('dashFilters');
+  if (!bar) return;
+  const phone = isPhoneLayout();
+  bar.hidden = !phone || !IS_ADMIN;
+  if (!phone || !IS_ADMIN) return;
+  fillDashEmpFilter();
+  bar.querySelectorAll('[data-dash-period]').forEach((btn) => {
+    btn.classList.toggle('is-active', btn.getAttribute('data-dash-period') === dashFilterPeriod);
+  });
+}
+
+function bindDashFilters() {
+  const bar = document.getElementById('dashFilters');
+  if (!bar || bar.dataset.bound === '1') return;
+  bar.dataset.bound = '1';
+  const sel = document.getElementById('dashEmpFilter');
+  if (sel) {
+    sel.addEventListener('change', () => {
+      dashFilterEmpId = sel.value || '';
+      renderDash();
+    });
+  }
+  bar.querySelectorAll('[data-dash-period]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const p = btn.getAttribute('data-dash-period');
+      if (!p || p === dashFilterPeriod) return;
+      dashFilterPeriod = p;
+      syncDashFilterChrome();
+      renderDash();
+    });
+  });
+}
+
 async function renderDash() {
   const t = today();
   const m = currentMonthKey();
   const monName = MOS[+m.split('-')[1]];
   const wk = wkDates();
-  const team = trackedEmps();
+  const phone = isPhoneLayout();
+  syncDashFilterChrome();
+  const team = phone && IS_ADMIN ? dashScopeTeam() : trackedEmps();
   const teamIds = new Set(team.map((e) => e.id));
+  const scopeLabel =
+    phone && dashFilterEmpId && team[0]
+      ? `${team[0].first}`
+      : phone
+        ? 'Team gesamt'
+        : 'alle Mitarbeiter';
   const wkM = ENTRIES.filter((e) => wk.includes(e.date) && teamIds.has(e.empId)).reduce(
     (s, e) => s + net(e),
     0
@@ -3113,19 +3140,57 @@ async function renderDash() {
     (s, e) => s + net(e),
     0
   );
-  const soll = team.reduce((s, e) => s + (e.target || 0) * 4, 0);
-  // Same user set + month as Stunden card: Σ hours × hourlyRate
-  const lohn = team.reduce((s, e) => s + totH(e.id, m) * (e.rate || 0), 0);
-  document.getElementById('dWk').textContent = formatHoursFromMinutes(wkM);
+  const weekSoll = team.reduce((s, e) => s + (e.target || 0), 0);
+  const monthSoll = team.reduce((s, e) => s + (e.target || 0) * 4, 0);
+  const weekLohn = team.reduce((s, e) => {
+    const mins = ENTRIES.filter((en) => en.empId === e.id && wk.includes(en.date)).reduce(
+      (a, en) => a + net(en),
+      0
+    );
+    return s + (mins / 60) * (e.rate || 0);
+  }, 0);
+  const monthLohn = team.reduce((s, e) => s + totH(e.id, m) * (e.rate || 0), 0);
+
+  // Phone: period toggle drives the three secondary KPIs. Desktop keeps Woche / Monat / Lohn.
+  const periodIsWeek = !phone || dashFilterPeriod === 'week';
+  const periodMins = periodIsWeek ? wkM : monM;
+  const periodSoll = periodIsWeek ? weekSoll : monthSoll;
+  const periodLohn = periodIsWeek ? weekLohn : monthLohn;
+  const periodHrs = periodMins / 60;
+  const sollPct = periodSoll > 0 ? Math.round((periodHrs / periodSoll) * 100) : 0;
+
+  const dPeriodShort = document.getElementById('dPeriodShort');
   const dMonLbl = document.getElementById('dMonLbl');
   const dLohnLbl = document.getElementById('dLohnLbl');
-  if (dMonLbl) dMonLbl.textContent = isPhoneLayout() ? monName : `Stunden ${monName}`;
-  if (dLohnLbl) dLohnLbl.textContent = isPhoneLayout() ? 'Lohn' : `Lohnkosten ${monName}`;
-  document.getElementById('dMon').textContent = formatHoursFromMinutes(monM);
-  document.getElementById('dMonSub').textContent = `von ${formatHours(soll)} Soll`;
-  document.getElementById('dLohn').textContent = isPhoneLayout()
-    ? `CHF ${Math.round(lohn).toLocaleString('de-CH')}`
-    : `CHF ${Math.round(lohn).toLocaleString('de-CH')}.–`;
+  const dWkSub = document.getElementById('dWkSub');
+  const dMonSub = document.getElementById('dMonSub');
+  const dLohnSub = document.getElementById('dLohnSub');
+
+  if (phone) {
+    if (dPeriodShort) dPeriodShort.textContent = periodIsWeek ? 'Woche' : monName;
+    document.getElementById('dWk').textContent = formatHoursFromMinutes(periodMins);
+    if (dWkSub) dWkSub.textContent = scopeLabel;
+    if (dMonLbl) dMonLbl.textContent = 'Soll';
+    document.getElementById('dMon').textContent =
+      periodSoll > 0 ? `${sollPct}%` : formatHours(periodSoll);
+    if (dMonSub) {
+      dMonSub.textContent =
+        periodSoll > 0 ? `von ${formatHours(periodSoll)}` : 'kein Soll';
+    }
+    if (dLohnLbl) dLohnLbl.textContent = 'Lohn';
+    document.getElementById('dLohn').textContent = `CHF ${Math.round(periodLohn).toLocaleString('de-CH')}`;
+    if (dLohnSub) dLohnSub.textContent = periodIsWeek ? 'Brutto · Woche' : 'Brutto geschätzt';
+  } else {
+    if (dPeriodShort) dPeriodShort.textContent = 'Woche';
+    document.getElementById('dWk').textContent = formatHoursFromMinutes(wkM);
+    if (dWkSub) dWkSub.textContent = 'alle Mitarbeiter';
+    if (dMonLbl) dMonLbl.textContent = `Stunden ${monName}`;
+    document.getElementById('dMon').textContent = formatHoursFromMinutes(monM);
+    if (dMonSub) dMonSub.textContent = `von ${formatHours(monthSoll)} Soll`;
+    if (dLohnLbl) dLohnLbl.textContent = `Lohnkosten ${monName}`;
+    document.getElementById('dLohn').textContent = `CHF ${Math.round(monthLohn).toLocaleString('de-CH')}.–`;
+    if (dLohnSub) dLohnSub.textContent = 'Brutto geschätzt';
+  }
   document.getElementById('dKW').textContent = String(IsoWeek.getISOWeekPartsFromYmd(t).week);
 
   document.getElementById('dTeam').innerHTML = team
@@ -3158,7 +3223,11 @@ async function renderDash() {
     .join('');
 
   try {
-    const openStats = await api('/dashboard/open');
+    const openQs =
+      phone && IS_ADMIN && dashFilterEmpId
+        ? `?userId=${encodeURIComponent(dashFilterEmpId)}`
+        : '';
+    const openStats = await api(`/dashboard/open${openQs}`);
     renderDashOpenBlock(openStats);
   } catch (e) {
     renderDashOpenBlock({ totalHours: 0, totalAmount: 0, sites: [], missingRate: { count: 0, hours: 0 } });
@@ -4238,7 +4307,8 @@ function initAfterLogin() {
   syncSidebarFromCur();
   tick();
   bindMobileBottomNav();
-  bindAdminMoreSheet();
+  bindAdminMorePage();
+  bindDashFilters();
   bindInstantTaps();
   activeViewName = '';
   renderMobileBottomNav();
@@ -4304,7 +4374,8 @@ const profilLogoutBtn = document.getElementById('profilLogoutBtn');
 if (profilLogoutBtn) profilLogoutBtn.addEventListener('click', doLogout);
 
 bindMobileBottomNav();
-bindAdminMoreSheet();
+bindAdminMorePage();
+bindDashFilters();
 bindInstantTaps();
 renderMobileBottomNav();
 trySession();

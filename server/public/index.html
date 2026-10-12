@@ -198,6 +198,7 @@ body {
 .dash-open-age { font-family:'JetBrains Mono',monospace;font-size:12px; }
 .dash-open-age.stale { color:var(--saniga-red);font-weight:700; }
 .dash-actions { display:none; }
+.dash-filters { display:none; }
 .dash-open-cards { display:none; }
 .dash-open-cta { display:none; }
 .dash-open-all { display:none; }
@@ -543,13 +544,13 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   }
 
   :root {
-    --mnav-h: calc(72px + env(safe-area-inset-bottom, 0px));
+    --mnav-h: calc(64px + env(safe-area-inset-bottom, 0px));
     --mfab-h: 52px;
     --mfab-gap: 14px;
   }
   .main { width: 100%; min-width: 0; padding-bottom: calc(var(--mnav-h) + 8px); }
   .topbar {
-    height: 56px; padding: 0 14px; gap: 10px;
+    height: 52px; padding: 0 14px; gap: 10px;
     justify-content: space-between;
   }
   .topbar-title { display: none; }
@@ -616,7 +617,12 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     overflow-x: hidden;
     max-width: 100%;
   }
+  /* Admin Home: pull content up — less dead air under the topbar */
+  .content:has(#view-dashboard.active) {
+    padding-top: 8px;
+  }
 
+  /* Light minimal tab bar — quiet active (color), no dark slab / filled blocks */
   .mobile-bottom-nav {
     display: flex;
     position: fixed;
@@ -624,19 +630,18 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     z-index: 240;
     height: var(--mnav-h);
     box-sizing: border-box;
-    background: #0f1f25;
-    border-top: 1px solid rgba(255,255,255,.1);
-    /* Safe area on the bar, not on each item — keeps icon hit columns stable */
-    padding: 0 0 env(safe-area-inset-bottom, 0px);
+    background: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: saturate(1.2) blur(16px);
+    backdrop-filter: saturate(1.2) blur(16px);
+    border-top: 1px solid rgba(15, 31, 37, 0.08);
+    box-shadow: 0 -1px 0 rgba(255,255,255,.8) inset;
+    padding: 0 4px env(safe-area-inset-bottom, 0px);
     justify-content: stretch;
     align-items: stretch;
     gap: 0;
     touch-action: manipulation;
     -webkit-user-select: none;
     user-select: none;
-  }
-  body.admin-more-open .mobile-bottom-nav {
-    z-index: 250;
   }
   .mobile-bottom-nav .mbnav-item {
     position: relative;
@@ -646,19 +651,19 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     height: 100%;
-    min-height: 56px;
+    min-height: 52px;
     margin: 0;
-    padding: 6px 2px 4px;
+    padding: 8px 2px 6px;
     border: none;
     background: transparent;
-    color: rgba(255,255,255,.55);
+    color: #8a97a0;
     font-family: inherit;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 600;
     letter-spacing: 0.01em;
-    line-height: 1.1;
+    line-height: 1.15;
     border-radius: 0;
     cursor: pointer;
     touch-action: manipulation;
@@ -666,7 +671,6 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     -webkit-user-select: none;
     user-select: none;
   }
-  /* Full equal column is the hit target — not just the small glyph */
   .mobile-bottom-nav .mbnav-item::before {
     content: '';
     position: absolute;
@@ -680,17 +684,17 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     pointer-events: none;
   }
   .mobile-bottom-nav .mbnav-item .mbnav-ico {
-    width: 44px;
-    height: 32px;
+    width: 40px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
   }
   .mobile-bottom-nav .mbnav-item .mbnav-ico svg {
-    width: 26px;
-    height: 26px;
-    stroke-width: 2.1;
+    width: 24px;
+    height: 24px;
+    stroke-width: 1.85;
     pointer-events: none;
   }
   .mobile-bottom-nav .mbnav-item .mbnav-lbl {
@@ -700,15 +704,17 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     text-overflow: ellipsis;
   }
   .mobile-bottom-nav .mbnav-item.active {
-    color: #fff;
-    background: rgba(18,184,225,.2);
+    color: #0a8fb0;
+    background: transparent;
+    font-weight: 750;
   }
   .mobile-bottom-nav .mbnav-item.active .mbnav-ico svg {
-    stroke: #5fd4f0;
+    stroke: #12B8E1;
+    stroke-width: 2.35;
   }
   .mobile-bottom-nav .mbnav-item.is-pressed,
   .mobile-bottom-nav .mbnav-item:active {
-    background: rgba(255,255,255,.12);
+    background: rgba(18, 184, 225, 0.08);
   }
 
   /* Create action — round + (not a second full-width primary CTA) */
@@ -796,56 +802,141 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 
   .grid2 { grid-template-columns: 1fr !important; gap: 14px; }
 
-  /* Admin dashboard — phone: one hero (Zu verrechnen), quiet secondary KPIs */
+  /* Admin dashboard — denser first screen: bigger KPIs, less vertical air */
   #view-dashboard .dash-actions { display: none !important; }
+  #view-dashboard .dash-filters {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin: 0 0 10px;
+  }
+  #view-dashboard .dash-filters[hidden] { display: none !important; }
+  #view-dashboard .dash-filter-emp {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  #view-dashboard .dash-filter-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--t3);
+  }
+  #view-dashboard #dashEmpFilter {
+    width: 100%;
+    min-height: 44px;
+    font-size: 15px;
+    font-family: inherit;
+    font-weight: 600;
+    color: var(--t1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    padding: 0 12px;
+  }
+  #view-dashboard .dash-period-toggle {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: stretch;
+    padding: 3px;
+    border-radius: 12px;
+    background: #e8eef1;
+    align-self: flex-end;
+    height: 44px;
+    box-sizing: border-box;
+  }
+  #view-dashboard .dash-period-btn {
+    border: none;
+    background: transparent;
+    color: var(--t2);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #view-dashboard .dash-period-btn.is-active {
+    background: #fff;
+    color: #0a8fb0;
+    box-shadow: 0 1px 3px rgba(15,31,37,.1);
+  }
   #view-dashboard .stats-grid {
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 10px !important;
   }
   #view-dashboard #dOpenCard {
     grid-column: 1 / -1;
-    padding: 16px 16px 14px;
+    padding: 18px 18px 16px;
     border-radius: 16px;
   }
   #view-dashboard #dOpenCard .stat-lbl-desktop { display: none !important; }
   #view-dashboard #dOpenCard .stat-lbl-phone { display: block !important; }
   #view-dashboard .stat-lbl-full { display: none !important; }
   #view-dashboard .stat-lbl-short { display: inline !important; }
+  #view-dashboard #dOpenCard .stat-lbl {
+    margin-bottom: 6px;
+  }
   #view-dashboard #dOpenCard .stat-val {
-    font-size: 28px;
-    letter-spacing: -0.03em;
+    font-size: 34px;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
   }
   #view-dashboard #dOpenCard .stat-sub {
-    font-size: 13px;
-    margin-top: 6px;
-    font-weight: 600;
+    font-size: 14px;
+    margin-top: 8px;
+    font-weight: 650;
     color: var(--t2);
   }
   #view-dashboard .stat-card:not(#dOpenCard) {
-    padding: 10px 10px 9px;
-    border-radius: 12px;
+    padding: 12px 11px 11px;
+    border-radius: 14px;
     box-shadow: none;
+    min-height: 88px;
   }
   #view-dashboard .stat-card:not(#dOpenCard) .stat-lbl {
-    font-size: 9px;
-    letter-spacing: .03em;
-    margin-bottom: 4px;
+    font-size: 10px;
+    letter-spacing: .04em;
+    margin-bottom: 6px;
     line-height: 1.15;
   }
   #view-dashboard .stat-card:not(#dOpenCard) .stat-val {
-    font-size: 14px !important;
-    letter-spacing: -0.01em;
+    font-size: 18px !important;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    font-weight: 800;
   }
+  /* Short context under each KPI — phone used to hide this, which made numbers meaningless */
   #view-dashboard .stat-card:not(#dOpenCard) .stat-sub {
-    display: none !important; /* less text on phone */
+    display: block !important;
+    margin-top: 5px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--t3);
+    white-space: normal;
   }
   #view-dashboard .stat-card {
     box-shadow: 0 1px 2px rgba(21,40,48,.04);
   }
   #view-dashboard .dash-lower {
     display: none !important; /* Team/KW live under Team tab */
+  }
+  #view-dashboard .dash-open-warn {
+    margin: 0 0 8px;
+    padding: 8px 12px;
+  }
+  #view-dashboard .dash-open-section.mb24 {
+    margin-bottom: 12px !important;
   }
   #view-dashboard #dOpenCard.is-attention {
     background: linear-gradient(180deg, #fff8f0 0%, #fff 70%);
@@ -1616,66 +1707,27 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     visibility: hidden;
     pointer-events: none;
   }
-  body.admin-more-open {
-    overflow: hidden;
+  /* Admin «Mehr» — normal full page (same navigation model as Rapporte) */
+  #view-mehr .mehr-lead {
+    margin: 0 0 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--t3);
+    line-height: 1.4;
   }
-  body.admin-more-open .mobile-fab {
-    visibility: hidden;
-    pointer-events: none;
+  #view-mehr .mehr-list {
+    padding-bottom: 8px;
   }
-
-  /* Admin «Mehr» hub — sits above content, stops above bottom nav */
-  #moAdminMore {
-    position: fixed !important;
-    inset: 0 !important;
-    bottom: var(--mnav-h) !important;
-    z-index: 220 !important;
-    background: rgba(15, 31, 37, .45) !important;
-    backdrop-filter: none !important;
-    align-items: flex-end !important;
-    justify-content: stretch !important;
-    padding: 0 !important;
-  }
-  #moAdminMore .admin-more-box {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    max-height: min(78dvh, 640px) !important;
-    border-radius: 18px 18px 0 0 !important;
-    border: none !important;
-    box-shadow: 0 -8px 32px rgba(15,31,37,.2) !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    transform: translateY(12px);
-    transition: transform .18s ease;
-    background: #fff !important;
-  }
-  #moAdminMore.open .admin-more-box { transform: none; }
-  .admin-more-head {
-    padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 12px !important;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    flex-shrink: 0;
-  }
-  .admin-more-scroll {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 8px 12px calc(20px + env(safe-area-inset-bottom, 0px));
-  }
-  .admin-more-sec {
+  #view-mehr .admin-more-sec {
     font-size: 11px;
     font-weight: 750;
     letter-spacing: .06em;
     text-transform: uppercase;
     color: var(--t3);
-    margin: 14px 8px 8px;
+    margin: 16px 4px 8px;
   }
-  .admin-more-item {
+  #view-mehr .admin-more-sec:first-child { margin-top: 0; }
+  #view-mehr .admin-more-item {
     width: 100%;
     display: flex;
     align-items: center;
@@ -1684,7 +1736,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     border: 1px solid var(--border);
     background: #fff;
     border-radius: 14px;
-    padding: 14px 14px;
+    padding: 14px;
     margin-bottom: 8px;
     font-family: inherit;
     color: inherit;
@@ -1693,11 +1745,11 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
-  .admin-more-item.is-pressed,
-  .admin-more-item:active {
+  #view-mehr .admin-more-item.is-pressed,
+  #view-mehr .admin-more-item:active {
     background: #f3f7f9;
   }
-  .admin-more-ico {
+  #view-mehr .admin-more-ico {
     width: 40px;
     height: 40px;
     border-radius: 12px;
@@ -1708,28 +1760,28 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     flex-shrink: 0;
     color: var(--saniga-red);
   }
-  .admin-more-ico svg { width: 20px; height: 20px; }
-  .admin-more-txt {
+  #view-mehr .admin-more-ico svg { width: 20px; height: 20px; }
+  #view-mehr .admin-more-txt {
     display: flex;
     flex-direction: column;
     gap: 2px;
     min-width: 0;
   }
-  .admin-more-txt strong {
+  #view-mehr .admin-more-txt strong {
     font-size: 15px;
     font-weight: 750;
     color: var(--t1);
   }
-  .admin-more-txt small {
+  #view-mehr .admin-more-txt small {
     font-size: 12px;
     color: var(--t3);
     font-weight: 500;
   }
-  .admin-more-danger .admin-more-ico {
+  #view-mehr .admin-more-danger .admin-more-ico {
     background: rgba(196,48,48,.1);
     color: var(--red);
   }
-  .admin-more-danger .admin-more-txt strong { color: var(--red); }
+  #view-mehr .admin-more-danger .admin-more-txt strong { color: var(--red); }
   #moEntry {
     position: fixed !important;
     inset: 0 !important;
@@ -2127,7 +2179,8 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 }
 
 @media (min-width: 768px) {
-  .mobile-bottom-nav, .mobile-fab, .mobile-cards, .topbar-user, .topbar-logo, #moAdminMore { display: none !important; }
+  .mobile-bottom-nav, .mobile-fab, .mobile-cards, .topbar-user, .topbar-logo { display: none !important; }
+  #view-mehr { display: none !important; }
   .dash-actions, .dash-open-cards, .dash-open-cta, .dash-open-all { display: none !important; }
   .dash-open-table-wrap { display: block !important; }
   body.role-admin .topbar-title { display: block; } /* desktop already shows title */
@@ -2332,8 +2385,18 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
         <button type="button" class="dash-action" onclick="showView('rapporte')">Rapporte</button>
         <button type="button" class="dash-action" onclick="showView('team')">Team</button>
         <button type="button" class="dash-action" onclick="showView('stammdaten')">Stammdaten</button>
-        <button type="button" class="dash-action" onclick="openAdminMoreSheet()">Mehr</button>
+        <button type="button" class="dash-action" onclick="showView('mehr')">Mehr</button>
       </nav>
+      <div class="dash-filters" id="dashFilters" hidden>
+        <label class="dash-filter-emp">
+          <span class="dash-filter-lbl">Mitarbeiter</span>
+          <select id="dashEmpFilter" aria-label="Mitarbeiter filtern"></select>
+        </label>
+        <div class="dash-period-toggle" role="group" aria-label="Zeitraum">
+          <button type="button" class="dash-period-btn is-active" data-dash-period="week">Woche</button>
+          <button type="button" class="dash-period-btn" data-dash-period="month">Monat</button>
+        </div>
+      </div>
       <div class="stats-grid mb24">
         <div class="stat-card stat-card-link is-clear" id="dOpenCard" role="button" tabindex="0" onclick="openRapporteOpenHours()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openRapporteOpenHours();}">
           <div class="stat-accent" style="background:linear-gradient(90deg,#d97706,#f59e0b);"></div>
@@ -2346,10 +2409,10 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           <div class="stat-accent" style="background:var(--green);"></div>
           <div class="stat-lbl">
             <span class="stat-lbl-full">Stunden diese Woche</span>
-            <span class="stat-lbl-short">Woche</span>
+            <span class="stat-lbl-short" id="dPeriodShort">Woche</span>
           </div>
           <div class="stat-val" id="dWk">—</div>
-          <div class="stat-sub">alle Mitarbeiter</div>
+          <div class="stat-sub" id="dWkSub">alle Mitarbeiter</div>
         </div>
         <div class="stat-card">
           <div class="stat-accent" style="background:var(--blue);"></div>
@@ -2361,7 +2424,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           <div class="stat-accent" style="background:var(--yellow);"></div>
           <div class="stat-lbl" id="dLohnLbl">Lohnkosten</div>
           <div class="stat-val" style="font-size:21px;" id="dLohn">—</div>
-          <div class="stat-sub">Brutto geschätzt</div>
+          <div class="stat-sub" id="dLohnSub">Brutto geschätzt</div>
         </div>
       </div>
       <p class="dash-open-warn" id="dOpenMissing" style="display:none;"></p>
@@ -2408,6 +2471,58 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           <div class="card-title" style="margin-bottom:18px;">Woche KW <span id="dKW"></span></div>
           <div id="dWkProg" style="display:flex;flex-direction:column;gap:16px;"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- MEHR (admin hub — full page, not a sheet) -->
+    <div class="view" id="view-mehr">
+      <p class="mehr-lead">Admin &amp; persönliche Bereiche</p>
+      <div class="mehr-list">
+        <div class="admin-more-sec">Verwaltung</div>
+        <button type="button" class="admin-more-item" data-more-view="stammdaten">
+          <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg></span>
+          <span class="admin-more-txt"><strong>Stammdaten</strong><small>Kunden, Objekte, Ansätze</small></span>
+        </button>
+        <button type="button" class="admin-more-item" data-more-view="rechnungen">
+          <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg></span>
+          <span class="admin-more-txt"><strong>Rechnungen</strong><small>Erstellte Rechnungen</small></span>
+        </button>
+        <button type="button" class="admin-more-item" data-more-view="stundenexport">
+          <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+          <span class="admin-more-txt"><strong>Stundenexport</strong><small>CSV für Treuhänder</small></span>
+        </button>
+        <button type="button" class="admin-more-item" data-more-view="alle">
+          <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+          <span class="admin-more-txt"><strong>Alle Einträge</strong><small>Team-Zeiten filtern</small></span>
+        </button>
+
+        <div class="admin-more-sec">Persönlich</div>
+        <button type="button" class="admin-more-item" data-more-view="meine">
+          <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <span class="admin-more-txt"><strong>Meine Zeiten</strong><small>Eigene Stunden erfassen</small></span>
+        </button>
+        <button type="button" class="admin-more-item" data-more-view="monat">
+          <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+          <span class="admin-more-txt"><strong>Monatsübersicht</strong><small>Eigene Monatswerte</small></span>
+        </button>
+        <button type="button" class="admin-more-item" data-more-view="absenzen">
+          <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.2 7.8a3.5 3.5 0 0 0-5-5L5 13l-1.5 5.5L9 17l10.2-9.2z"/></svg></span>
+          <span class="admin-more-txt"><strong>Absenzen</strong><small>Ferien, Krankheit, Feiertage</small></span>
+        </button>
+        <button type="button" class="admin-more-item" data-more-view="profil">
+          <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+          <span class="admin-more-txt"><strong>Profil</strong><small>Name, Passwort, Sync</small></span>
+        </button>
+
+        <div class="admin-more-sec">Konto</div>
+        <a class="admin-more-item" id="adminMoreInvite" href="/join.html">
+          <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></span>
+          <span class="admin-more-txt"><strong>Mitarbeiter einladen</strong><small>Einladungslink öffnen</small></span>
+        </a>
+        <button type="button" class="admin-more-item admin-more-danger" id="adminMoreLogout">
+          <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+          <span class="admin-more-txt"><strong>Abmelden</strong><small>Sitzung beenden</small></span>
+        </button>
       </div>
     </div>
 
@@ -2916,65 +3031,6 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   <!-- Filled by renderMobileBottomNav() for employee vs admin -->
 </nav>
 
-<!-- Admin «Mehr» hub (phone) -->
-<div class="mo admin-more-sheet" id="moAdminMore" aria-hidden="true">
-  <div class="mo-box admin-more-box" role="dialog" aria-modal="true" aria-labelledby="adminMoreTitle">
-    <div class="mo-sheet-head admin-more-head">
-      <div style="min-width:0;flex:1;">
-        <div class="mo-title" id="adminMoreTitle">Mehr</div>
-        <div class="mo-sub">Admin &amp; persönliche Bereiche</div>
-      </div>
-      <button type="button" class="mo-sheet-close" id="adminMoreClose" aria-label="Schliessen">×</button>
-    </div>
-    <div class="mo-scroll admin-more-scroll">
-      <div class="admin-more-sec">Verwaltung</div>
-      <button type="button" class="admin-more-item" data-more-view="stammdaten">
-        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg></span>
-        <span class="admin-more-txt"><strong>Stammdaten</strong><small>Kunden, Objekte, Ansätze</small></span>
-      </button>
-      <button type="button" class="admin-more-item" data-more-view="rechnungen">
-        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg></span>
-        <span class="admin-more-txt"><strong>Rechnungen</strong><small>Erstellte Rechnungen</small></span>
-      </button>
-      <button type="button" class="admin-more-item" data-more-view="stundenexport">
-        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
-        <span class="admin-more-txt"><strong>Stundenexport</strong><small>CSV für Treuhänder</small></span>
-      </button>
-      <button type="button" class="admin-more-item" data-more-view="alle">
-        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-        <span class="admin-more-txt"><strong>Alle Einträge</strong><small>Team-Zeiten filtern</small></span>
-      </button>
-
-      <div class="admin-more-sec">Persönlich</div>
-      <button type="button" class="admin-more-item" data-more-view="meine">
-        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-        <span class="admin-more-txt"><strong>Meine Zeiten</strong><small>Eigene Stunden erfassen</small></span>
-      </button>
-      <button type="button" class="admin-more-item" data-more-view="monat">
-        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-        <span class="admin-more-txt"><strong>Monatsübersicht</strong><small>Eigene Monatswerte</small></span>
-      </button>
-      <button type="button" class="admin-more-item" data-more-view="absenzen">
-        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.2 7.8a3.5 3.5 0 0 0-5-5L5 13l-1.5 5.5L9 17l10.2-9.2z"/></svg></span>
-        <span class="admin-more-txt"><strong>Absenzen</strong><small>Ferien, Krankheit, Feiertage</small></span>
-      </button>
-      <button type="button" class="admin-more-item" data-more-view="profil">
-        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-        <span class="admin-more-txt"><strong>Profil</strong><small>Name, Passwort, Sync</small></span>
-      </button>
-
-      <div class="admin-more-sec">Konto</div>
-      <a class="admin-more-item" id="adminMoreInvite" href="/join.html">
-        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg></span>
-        <span class="admin-more-txt"><strong>Mitarbeiter einladen</strong><small>Einladungslink öffnen</small></span>
-      </a>
-      <button type="button" class="admin-more-item admin-more-danger" id="adminMoreLogout">
-        <span class="admin-more-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
-        <span class="admin-more-txt"><strong>Abmelden</strong><small>Sitzung beenden</small></span>
-      </button>
-    </div>
-  </div>
-</div>
 <button type="button" class="mobile-fab" id="mobileFab" data-action="add-hours" aria-label="Stunden erfassen" title="Stunden erfassen">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   <span class="fab-lbl">Stunden erfassen</span>
