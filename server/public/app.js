@@ -60,7 +60,18 @@ async function api(path, opts = {}) {
     data = { error: text || 'Ungültige Antwort' };
   }
   if (!r.ok) {
-    const err = new Error(data.error || `HTTP ${r.status}`);
+    let msg = data.error || `HTTP ${r.status}`;
+    // Avoid dumping HTML error pages (e.g. missing mock route) onto the phone UI.
+    if (typeof msg === 'string' && /<!DOCTYPE|<html/i.test(msg)) {
+      const m = msg.match(/<pre>([^<]+)<\/pre>/i);
+      const pre = m ? m[1].trim() : '';
+      if (/Cannot POST|Cannot GET/i.test(pre)) {
+        msg = 'Aktion auf diesem Server nicht verfügbar. Bitte App neu laden.';
+      } else {
+        msg = `Serverfehler (HTTP ${r.status})`;
+      }
+    }
+    const err = new Error(msg);
     err.status = r.status;
     err.data = data;
     throw err;
@@ -734,13 +745,20 @@ function syncMobileChrome(n) {
     btn.classList.toggle('active', on);
   });
   const fab = document.getElementById('mobileFab');
+  let showFab = false;
   if (fab) {
-    const showFab = n === 'meine';
+    // Workers: FAB on Meine Zeiten. Admin: also on main phone tabs (Home/Team/Rapporte)
+    // so Stunden for self or others aren’t buried under Mehr → Meine Zeiten.
+    showFab =
+      n === 'meine' ||
+      n === 'monat' ||
+      (IS_ADMIN && (n === 'dashboard' || n === 'team' || n === 'rapporte' || n === 'alle'));
     fab.classList.toggle('show', showFab);
     fab.setAttribute('aria-hidden', showFab ? 'false' : 'true');
     fab.tabIndex = showFab ? 0 : -1;
   }
   document.body.classList.toggle('mobile-meine-open', n === 'meine');
+  document.body.classList.toggle('mobile-fab-open', showFab);
 }
 
 function showView(n) {
@@ -778,18 +796,49 @@ function showView(n) {
   }
 }
 
-/** Instant bottom-nav response on iPhone (pointerup with small move = tap). */
+/**
+ * Bottom nav: equal-width columns, hit-test by finger X (not tiny icon bounds).
+ * Touch commits on pointerdown so a slight finger wobble never “eats” the first tap.
+ */
 function bindMobileBottomNav() {
   const nav = document.getElementById('mobileBottomNav');
   if (!nav || nav.dataset.bound === '1') return;
   nav.dataset.bound = '1';
   let lastPointerView = '';
   let lastPointerAt = 0;
-  let pressBtn = null;
-  let pressX = 0;
-  let pressY = 0;
-  let pressId = null;
   let navLockUntil = 0;
+  let pressId = null;
+
+  function clearPressed() {
+    nav.querySelectorAll('.is-pressed').forEach((b) => b.classList.remove('is-pressed'));
+  }
+
+  /** Stable column under finger — same point every time, icon or label. */
+  function btnFromPoint(x, y) {
+    const navRect = nav.getBoundingClientRect();
+    // Allow a few px above the bar (fat-finger aiming at icons)
+    if (y < navRect.top - 12 || y > navRect.bottom + 2) return null;
+    if (x < navRect.left || x > navRect.right) return null;
+    const items = [...nav.querySelectorAll('.mbnav-item')];
+    if (!items.length) return null;
+    for (const item of items) {
+      const r = item.getBoundingClientRect();
+      if (x >= r.left && x < r.right) return item;
+    }
+    // Edge pixels: nearest column center
+    let best = items[0];
+    let bestDist = Infinity;
+    for (const item of items) {
+      const r = item.getBoundingClientRect();
+      const cx = (r.left + r.right) / 2;
+      const dist = Math.abs(x - cx);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = item;
+      }
+    }
+    return best;
+  }
 
   function go(btn) {
     if (!btn || !nav.contains(btn)) return false;
@@ -797,9 +846,10 @@ function bindMobileBottomNav() {
     if (!view) return false;
     const now = Date.now();
     if (now < navLockUntil && view === lastPointerView) return true;
-    navLockUntil = now + 320;
+    navLockUntil = now + 280;
     lastPointerView = view;
     lastPointerAt = now;
+    clearPressed();
     btn.classList.add('is-pressed');
     if (view === 'mehr') {
       if (document.getElementById('moAdminMore')?.classList.contains('open')) closeAdminMoreSheet();
@@ -815,49 +865,45 @@ function bindMobileBottomNav() {
     'pointerdown',
     (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      const btn = e.target.closest('.mbnav-item');
-      if (!btn || !nav.contains(btn)) return;
-      pressBtn = btn;
-      pressX = e.clientX;
-      pressY = e.clientY;
+      const btn = btnFromPoint(e.clientX, e.clientY);
+      if (!btn) return;
       pressId = e.pointerId;
-      btn.classList.add('is-pressed');
-      try {
-        btn.setPointerCapture(e.pointerId);
-      } catch (_) {
-        /* ignore */
+      // Touch/pen: commit immediately — no second tap after wobble on lift
+      if (e.pointerType !== 'mouse') {
+        go(btn);
+        e.preventDefault();
+        return;
       }
+      btn.classList.add('is-pressed');
     },
-    { passive: true }
+    { passive: false }
   );
-
-  function endPress(e, commit) {
-    if (pressId != null && e.pointerId !== pressId) return;
-    const btn = pressBtn;
-    const dx = Math.abs((e.clientX || 0) - pressX);
-    const dy = Math.abs((e.clientY || 0) - pressY);
-    pressBtn = null;
-    pressId = null;
-    nav.querySelectorAll('.is-pressed').forEach((b) => b.classList.remove('is-pressed'));
-    if (!commit || !btn) return;
-    if (dx > 14 || dy > 14) return;
-    go(btn);
-    e.preventDefault();
-  }
 
   nav.addEventListener(
     'pointerup',
-    (e) => endPress(e, true),
+    (e) => {
+      if (pressId != null && e.pointerId !== pressId) return;
+      const wasMouse = e.pointerType === 'mouse';
+      pressId = null;
+      clearPressed();
+      if (!wasMouse) {
+        e.preventDefault();
+        return;
+      }
+      const btn = btnFromPoint(e.clientX, e.clientY);
+      if (!btn) return;
+      go(btn);
+      e.preventDefault();
+    },
     { passive: false }
   );
-  nav.addEventListener('pointercancel', (e) => endPress(e, false));
-  nav.addEventListener('pointerleave', (e) => {
-    if (pressId != null && e.pointerId === pressId && e.target === nav) endPress(e, false);
+  nav.addEventListener('pointercancel', () => {
+    pressId = null;
+    clearPressed();
   });
 
-  // Keyboard / desktop fallback when pointerdown was not used
   nav.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mbnav-item');
+    const btn = e.target.closest('.mbnav-item') || btnFromPoint(e.clientX, e.clientY);
     if (!btn || !nav.contains(btn)) return;
     e.preventDefault();
     const view = btn.getAttribute('data-view') || '';
@@ -2953,8 +2999,14 @@ function renderDashOpenBlock(stats) {
 
   const totalHours = Number(stats?.totalHours || 0);
   const totalAmount = Number(stats?.totalAmount || 0);
-  hrsEl.textContent = formatHours(totalHours);
-  amtEl.textContent = `netto CHF ${formatSwissChf(totalAmount)}`;
+  // Phone hero: CHF first (owner focus). Desktop keeps hours + netto subline.
+  if (isPhoneLayout()) {
+    hrsEl.textContent = `CHF ${formatSwissChf(totalAmount)}`;
+    amtEl.textContent = `${formatHours(totalHours)} offen`;
+  } else {
+    hrsEl.textContent = formatHours(totalHours);
+    amtEl.textContent = `netto CHF ${formatSwissChf(totalAmount)}`;
+  }
 
   const sites = stats?.sites || [];
   if (count) count.textContent = String(sites.length);
@@ -2978,9 +3030,10 @@ function renderDashOpenBlock(stats) {
     if (hasMissing) {
       const n = missing.count;
       const hLabel = formatHours(missing.hours);
-      warn.innerHTML =
-        `${n} ${n === 1 ? 'Eintrag hat' : 'Einträge haben'} keinen Ansatz (${escapeAttr(hLabel)}) und sind im Betrag nicht enthalten. ` +
-        `<a href="#" onclick="event.preventDefault();openAnsaetzeFromDash();">Ansätze in Stammdaten öffnen</a>`;
+      warn.innerHTML = isPhoneLayout()
+        ? `${n} ohne Ansatz (${escapeAttr(hLabel)}). <a href="#" onclick="event.preventDefault();openAnsaetzeFromDash();">Ansätze öffnen</a>`
+        : `${n} ${n === 1 ? 'Eintrag hat' : 'Einträge haben'} keinen Ansatz (${escapeAttr(hLabel)}) und sind im Betrag nicht enthalten. ` +
+          `<a href="#" onclick="event.preventDefault();openAnsaetzeFromDash();">Ansätze in Stammdaten öffnen</a>`;
       warn.style.display = 'block';
     } else {
       warn.innerHTML = '';
@@ -3022,16 +3075,23 @@ function renderDashOpenBlock(stats) {
       <td>${amountCell}</td>
       <td><span class="dash-open-age ${stale ? 'stale' : ''}">${escapeAttr(String(s.ageDays))} Tage</span><div style="color:var(--t3);font-size:11px;margin-top:2px;">seit ${escapeAttr(IsoWeek.formatDe(s.oldestDate))}</div></td>
     </tr>`);
+    const amtClass = missingAmt && !(Number(s.amount) > 0) ? ' is-missing' : '';
     cardRows.push(`<button type="button" class="dash-open-card${cardTone}" onclick="openRapporteOpenHours()">
       <div class="dash-open-card-top">
-        <div class="dash-open-card-cust">${escapeAttr(s.customerName || 'Kunde')}</div>
-        <div class="dash-open-card-hrs">${escapeAttr(formatHours(s.hours))}</div>
+        <div class="dash-open-card-main">
+          <div class="dash-open-card-cust">${escapeAttr(s.customerName || 'Kunde')}</div>
+          <div class="dash-open-card-site">${escapeAttr(s.siteLabel || 'Objekt')}</div>
+        </div>
+        <div class="dash-open-card-right">
+          <div class="dash-open-card-hrs">${escapeAttr(formatHours(s.hours))}</div>
+          <div class="dash-open-card-amt${amtClass}">${escapeAttr(amountLabel)}</div>
+        </div>
       </div>
-      <div class="dash-open-card-site">${escapeAttr(s.siteLabel || 'Objekt')}</div>
       <div class="dash-open-card-meta">
         <span>${escapeAttr(amountLabel)}</span>
         <span class="${stale ? 'stale' : ''}">${escapeAttr(String(s.ageDays))} Tg · seit ${escapeAttr(IsoWeek.formatDe(s.oldestDate))}</span>
       </div>
+      ${stale ? `<div class="dash-open-card-age">${escapeAttr(String(s.ageDays))} Tage offen · seit ${escapeAttr(IsoWeek.formatDe(s.oldestDate))}</div>` : ''}
     </button>`);
   }
   body.innerHTML = rows.join('');
@@ -3059,11 +3119,13 @@ async function renderDash() {
   document.getElementById('dWk').textContent = formatHoursFromMinutes(wkM);
   const dMonLbl = document.getElementById('dMonLbl');
   const dLohnLbl = document.getElementById('dLohnLbl');
-  if (dMonLbl) dMonLbl.textContent = `Stunden ${monName}`;
-  if (dLohnLbl) dLohnLbl.textContent = `Lohnkosten ${monName}`;
+  if (dMonLbl) dMonLbl.textContent = isPhoneLayout() ? monName : `Stunden ${monName}`;
+  if (dLohnLbl) dLohnLbl.textContent = isPhoneLayout() ? 'Lohn' : `Lohnkosten ${monName}`;
   document.getElementById('dMon').textContent = formatHoursFromMinutes(monM);
   document.getElementById('dMonSub').textContent = `von ${formatHours(soll)} Soll`;
-  document.getElementById('dLohn').textContent = `CHF ${Math.round(lohn).toLocaleString('de-CH')}.–`;
+  document.getElementById('dLohn').textContent = isPhoneLayout()
+    ? `CHF ${Math.round(lohn).toLocaleString('de-CH')}`
+    : `CHF ${Math.round(lohn).toLocaleString('de-CH')}.–`;
   document.getElementById('dKW').textContent = String(IsoWeek.getISOWeekPartsFromYmd(t).week);
 
   document.getElementById('dTeam').innerHTML = team

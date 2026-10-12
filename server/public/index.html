@@ -198,7 +198,12 @@ body {
 .dash-actions { display:none; }
 .dash-open-cards { display:none; }
 .dash-open-cta { display:none; }
+.dash-open-all { display:none; }
 .dash-open-table-wrap { overflow-x:auto; }
+.stat-lbl-phone,
+.stat-lbl-short,
+.dash-open-title-phone,
+.dash-open-cta-phone { display:none; }
 
 /* ── GRID ── */
 .grid2 { display:grid;grid-template-columns:1fr 1fr;gap:20px; }
@@ -619,7 +624,8 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     box-sizing: border-box;
     background: #0f1f25;
     border-top: 1px solid rgba(255,255,255,.1);
-    padding: 0;
+    /* Safe area on the bar, not on each item — keeps icon hit columns stable */
+    padding: 0 0 env(safe-area-inset-bottom, 0px);
     justify-content: stretch;
     align-items: stretch;
     gap: 0;
@@ -631,16 +637,18 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     z-index: 250;
   }
   .mobile-bottom-nav .mbnav-item {
+    position: relative;
     flex: 1 1 0;
     min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    gap: 4px;
+    justify-content: center;
+    gap: 3px;
     height: 100%;
-    min-height: 72px;
-    padding: 10px 4px calc(10px + env(safe-area-inset-bottom, 0px));
+    min-height: 56px;
+    margin: 0;
+    padding: 6px 2px 4px;
     border: none;
     background: transparent;
     color: rgba(255,255,255,.55);
@@ -656,14 +664,26 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     -webkit-user-select: none;
     user-select: none;
   }
+  /* Full equal column is the hit target — not just the small glyph */
+  .mobile-bottom-nav .mbnav-item::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+  .mobile-bottom-nav .mbnav-item .mbnav-ico,
+  .mobile-bottom-nav .mbnav-item .mbnav-lbl {
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+  }
   .mobile-bottom-nav .mbnav-item .mbnav-ico {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    pointer-events: none;
   }
   .mobile-bottom-nav .mbnav-item .mbnav-ico svg {
     width: 26px;
@@ -672,7 +692,6 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     pointer-events: none;
   }
   .mobile-bottom-nav .mbnav-item .mbnav-lbl {
-    pointer-events: none;
     white-space: nowrap;
     max-width: 100%;
     overflow: hidden;
@@ -690,32 +709,52 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     background: rgba(255,255,255,.12);
   }
 
+  /* Create action — round + (not a second full-width primary CTA) */
   .mobile-fab {
     display: none;
     pointer-events: none;
     position: fixed;
-    left: 14px; right: 14px;
-    bottom: calc(var(--mnav-h) + var(--mfab-gap));
+    left: auto;
+    right: 16px;
+    bottom: calc(var(--mnav-h) + 14px);
     z-index: 80;
-    height: var(--mfab-h);
-    min-height: var(--mfab-h);
-    align-items: center; justify-content: center; gap: 8px;
-    border: none; border-radius: 14px;
-    background: linear-gradient(135deg,#12B8E1,#3dc4ea);
-    color: #fff; font-family: inherit; font-size: 16px; font-weight: 700;
-    box-shadow: 0 8px 24px rgba(18,184,225,.35);
+    width: 56px;
+    height: 56px;
+    min-height: 56px;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    border: none;
+    border-radius: 50%;
+    background: linear-gradient(145deg,#12B8E1,#2bbfe6);
+    color: #fff;
+    font-family: inherit;
+    font-size: 0;
+    font-weight: 700;
+    box-shadow: 0 10px 28px rgba(15,31,37,.28), 0 4px 12px rgba(18,184,225,.35);
     cursor: pointer;
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   .mobile-fab.show {
     display: flex;
     pointer-events: auto;
   }
-  .mobile-fab svg { width: 20px; height: 20px; pointer-events: none; }
+  .mobile-fab .fab-lbl { display: none; }
+  .mobile-fab svg {
+    width: 26px;
+    height: 26px;
+    stroke-width: 2.6;
+    pointer-events: none;
+  }
   .mobile-fab.is-pressed,
   .mobile-fab:active {
-    transform: scale(0.98);
-    filter: brightness(0.96);
+    transform: scale(0.94);
+    filter: brightness(0.97);
+  }
+  body.mobile-fab-open .content {
+    padding-bottom: calc(var(--mnav-h) + 80px);
   }
   .wd.is-pressed,
   .wd:active {
@@ -729,44 +768,82 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   /* Snappier view switches on phone — skip fade delay */
   .view { animation: none; }
   .mo { transition: opacity .12s; backdrop-filter: none; }
+  /* Above bottom nav (240) + Mehr (250) so confirm buttons stay tappable */
+  .mo.open { z-index: 280; }
   .mo-box { transition: none; transform: none; }
-  #view-meine .quick-add { display: none; }
-  body.mobile-meine-open .content {
-    padding-bottom: calc(var(--mnav-h) + var(--mfab-h) + var(--mfab-gap) + 20px);
+  #moRpInvoice .mo-box {
+    width: min(100%, 520px);
+    max-width: calc(100vw - 28px);
+    max-height: calc(100vh - 48px);
+    max-height: calc(100dvh - 48px);
+    overflow: auto;
+    padding: 20px 18px;
+    border-radius: 16px;
   }
+  #moRpInvoice .mo-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  #moRpInvoice .mo-actions .btn {
+    flex: 1 1 auto;
+    min-height: 48px;
+    justify-content: center;
+  }
+  #view-meine .quick-add { display: none; }
 
   .grid2 { grid-template-columns: 1fr !important; gap: 14px; }
 
-  /* Admin dashboard — phone app home (no duplicate shortcuts; bottom nav covers that) */
+  /* Admin dashboard — phone: one hero (Zu verrechnen), quiet secondary KPIs */
   #view-dashboard .dash-actions { display: none !important; }
   #view-dashboard .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 10px;
-    margin-bottom: 14px;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  #view-dashboard #dOpenCard {
+    grid-column: 1 / -1;
+    padding: 16px 16px 14px;
+    border-radius: 16px;
+  }
+  #view-dashboard #dOpenCard .stat-lbl-desktop { display: none !important; }
+  #view-dashboard #dOpenCard .stat-lbl-phone { display: block !important; }
+  #view-dashboard .stat-lbl-full { display: none !important; }
+  #view-dashboard .stat-lbl-short { display: inline !important; }
+  #view-dashboard #dOpenCard .stat-val {
+    font-size: 28px;
+    letter-spacing: -0.03em;
+  }
+  #view-dashboard #dOpenCard .stat-sub {
+    font-size: 13px;
+    margin-top: 6px;
+    font-weight: 600;
+    color: var(--t2);
+  }
+  #view-dashboard .stat-card:not(#dOpenCard) {
+    padding: 10px 10px 9px;
+    border-radius: 12px;
+    box-shadow: none;
+  }
+  #view-dashboard .stat-card:not(#dOpenCard) .stat-lbl {
+    font-size: 9px;
+    letter-spacing: .03em;
+    margin-bottom: 4px;
+    line-height: 1.15;
+  }
+  #view-dashboard .stat-card:not(#dOpenCard) .stat-val {
+    font-size: 14px !important;
+    letter-spacing: -0.01em;
+  }
+  #view-dashboard .stat-card:not(#dOpenCard) .stat-sub {
+    display: none !important; /* less text on phone */
   }
   #view-dashboard .stat-card {
-    padding: 14px 14px 12px;
-    border-radius: 14px;
     box-shadow: 0 1px 2px rgba(21,40,48,.04);
   }
-  #view-dashboard .stat-lbl {
-    font-size: 10px;
-    letter-spacing: .04em;
-    margin-bottom: 6px;
-    line-height: 1.2;
-  }
-  #view-dashboard .stat-val {
-    font-size: 22px;
-    letter-spacing: -0.02em;
-  }
-  #view-dashboard #dLohn.stat-val,
-  #view-dashboard .stat-card .stat-val[style*="font-size:21px"] {
-    font-size: 18px !important;
-  }
-  #view-dashboard .stat-sub {
-    font-size: 11px;
-    margin-top: 4px;
-    line-height: 1.3;
+  #view-dashboard .dash-lower {
+    display: none !important; /* Team/KW live under Team tab */
   }
   #view-dashboard #dOpenCard.is-attention {
     background: linear-gradient(180deg, #fff8f0 0%, #fff 70%);
@@ -791,39 +868,30 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     margin-bottom: 14px;
     box-shadow: 0 1px 2px rgba(21,40,48,.04);
     border: 1px solid var(--border);
+    background: #fff;
   }
   #view-dashboard .dash-open-section.is-attention {
-    border-color: rgba(217,119,6,.35);
-    background: #fffbf5;
+    border-color: rgba(217,119,6,.28);
   }
   #view-dashboard .dash-open-section.is-critical {
-    border-color: rgba(196,48,48,.35);
-    background: #fff8f8;
+    border-color: rgba(220,38,38,.28);
   }
   #view-dashboard .dash-open-section .card-header {
-    padding: 12px 14px;
+    padding: 12px 14px 8px;
     border-bottom: none;
   }
-  #view-dashboard .dash-open-section.is-attention .card-title::before,
-  #view-dashboard .dash-open-section.is-critical .card-title::before {
-    content: '';
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 8px;
-    vertical-align: 1px;
-    background: #d97706;
+  #view-dashboard .dash-open-section .card-title {
+    font-size: 14px;
   }
-  #view-dashboard .dash-open-section.is-critical .card-title::before {
-    background: var(--red);
-  }
-  #view-dashboard .dash-open-section.is-attention #dOpenCount {
-    background: rgba(217,119,6,.16);
+  #view-dashboard .dash-open-title-desktop { display: none !important; }
+  #view-dashboard .dash-open-title-phone { display: inline !important; }
+  #view-dashboard .dash-open-section.is-attention #dOpenCount,
+  #view-dashboard .dash-open-section.is-critical #dOpenCount {
+    background: rgba(217,119,6,.14);
     color: #9a3412;
   }
   #view-dashboard .dash-open-section.is-critical #dOpenCount {
-    background: rgba(220,38,38,.14);
+    background: rgba(220,38,38,.12);
     color: var(--red);
   }
   #view-dashboard .dash-open-table-wrap { display: none !important; }
@@ -836,9 +904,9 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
   #view-dashboard .dash-open-card {
     width: 100%;
     text-align: left;
-    border: 1px solid rgba(217,119,6,.22);
+    border: 1px solid var(--border);
     border-radius: 12px;
-    background: #fff;
+    background: #f7fafb;
     padding: 12px 14px;
     font-family: inherit;
     color: inherit;
@@ -846,98 +914,116 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     touch-action: manipulation;
     box-shadow: inset 3px 0 0 #f59e0b;
   }
-  #view-dashboard .dash-open-card.is-missing {
-    border-color: rgba(220,38,38,.28);
+  #view-dashboard .dash-open-card.is-missing,
+  #view-dashboard .dash-open-card.is-stale {
     box-shadow: inset 3px 0 0 var(--red);
     background: #fffafa;
-  }
-  #view-dashboard .dash-open-card.is-stale {
-    border-color: rgba(220,38,38,.4);
-    background: rgba(220,38,38,.06);
-    box-shadow: inset 3px 0 0 var(--red);
   }
   #view-dashboard .dash-open-card-top {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 4px;
+    gap: 12px;
   }
+  #view-dashboard .dash-open-card-main { min-width: 0; flex: 1; }
   #view-dashboard .dash-open-card-cust {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 750;
     color: var(--t1);
     line-height: 1.25;
   }
-  #view-dashboard .dash-open-card-hrs {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
-    font-weight: 800;
-    color: #c2410c;
-    flex-shrink: 0;
-  }
-  #view-dashboard .dash-open-card.is-missing .dash-open-card-hrs,
-  #view-dashboard .dash-open-card.is-stale .dash-open-card-hrs {
-    color: var(--red);
-  }
   #view-dashboard .dash-open-card-site {
     font-size: 12px;
-    color: var(--t2);
-    margin-bottom: 8px;
-  }
-  #view-dashboard .dash-open-card-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 12px;
     color: var(--t3);
+    margin-top: 2px;
+    margin-bottom: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  #view-dashboard .dash-open-card-meta .stale { color: var(--red); font-weight: 700; }
+  #view-dashboard .dash-open-card-right {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  #view-dashboard .dash-open-card-hrs {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--t1);
+  }
+  #view-dashboard .dash-open-card-amt {
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--t2);
+    margin-top: 2px;
+  }
+  #view-dashboard .dash-open-card-amt.is-missing {
+    color: var(--red);
+    font-weight: 700;
+  }
+  #view-dashboard .dash-open-card-age {
+    display: none;
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--red);
+  }
+  #view-dashboard .dash-open-card.is-stale .dash-open-card-age {
+    display: block;
+  }
+  #view-dashboard .dash-open-card-meta { display: none !important; }
   #view-dashboard .dash-open-empty {
     padding: 18px 8px;
     text-align: center;
     color: var(--t3);
     font-size: 13px;
   }
-  #view-dashboard .dash-open-cta {
-    display: flex !important;
-    width: calc(100% - 24px);
-    margin: 0 12px 14px;
-    min-height: 44px;
+  /* Rapporte = navigate inside the list (header link), not a second primary button */
+  #view-dashboard .dash-open-section > .dash-open-cta {
+    display: none !important;
+  }
+  #view-dashboard .dash-open-section .card-header {
     align-items: center;
-    justify-content: center;
+    gap: 8px;
+    padding-right: 4px;
+  }
+  #view-dashboard .dash-open-all {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+    padding: 8px 6px 8px 10px;
     border: none;
-    border-radius: 12px;
-    background: linear-gradient(135deg,#12B8E1,#3dc4ea);
-    color: #fff;
+    background: transparent;
+    color: #0a8fb0;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
+    letter-spacing: 0.01em;
     cursor: pointer;
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
   }
-  #view-dashboard .dash-team-card,
-  #view-dashboard .dash-week-card {
-    border-radius: 16px;
-    box-shadow: 0 1px 2px rgba(21,40,48,.04);
+  #view-dashboard .dash-open-all:active {
+    opacity: 0.65;
   }
-  #view-dashboard .dash-week-card { padding: 14px !important; }
-  #view-dashboard .dash-week-card .card-title { margin-bottom: 12px !important; font-size: 14px; }
-  #view-dashboard #dTeam .ei {
-    padding: 10px 12px;
-    gap: 10px;
+  #view-dashboard .dash-open-all svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.4;
   }
-  #view-dashboard #dTeam .ei > div:nth-child(3) {
-    display: none; /* hide role label on phone — keeps row readable */
-  }
+  #view-dashboard .dash-open-cta-desktop { display: none !important; }
+  #view-dashboard .dash-open-cta-phone { display: none !important; }
   #view-dashboard .dash-open-warn {
     font-size: 12px;
-    margin: 0 0 12px;
+    margin: 0 0 10px;
     padding: 10px 12px;
-    background: rgba(196,48,48,.08);
-    border: 1px solid rgba(196,48,48,.22);
+    background: rgba(220,38,38,.06);
+    border: 1px solid rgba(220,38,38,.18);
     border-radius: 12px;
     color: #9f1f1f;
+    line-height: 1.35;
   }
 
   /* Team — list → detail sheet */
@@ -2040,7 +2126,7 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
 
 @media (min-width: 768px) {
   .mobile-bottom-nav, .mobile-fab, .mobile-cards, .topbar-user, .topbar-logo, #moAdminMore { display: none !important; }
-  .dash-actions, .dash-open-cards, .dash-open-cta { display: none !important; }
+  .dash-actions, .dash-open-cards, .dash-open-cta, .dash-open-all { display: none !important; }
   .dash-open-table-wrap { display: block !important; }
   body.role-admin .topbar-title { display: block; } /* desktop already shows title */
   .desktop-table { display: table; }
@@ -2249,13 +2335,17 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       <div class="stats-grid mb24">
         <div class="stat-card stat-card-link is-clear" id="dOpenCard" role="button" tabindex="0" onclick="openRapporteOpenHours()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openRapporteOpenHours();}">
           <div class="stat-accent" style="background:linear-gradient(90deg,#d97706,#f59e0b);"></div>
-          <div class="stat-lbl">Offene Stunden</div>
+          <div class="stat-lbl stat-lbl-desktop">Offene Stunden</div>
+          <div class="stat-lbl stat-lbl-phone">Zu verrechnen</div>
           <div class="stat-val" id="dOpenHrs">—</div>
           <div class="stat-sub" id="dOpenAmt">netto CHF —</div>
         </div>
         <div class="stat-card">
           <div class="stat-accent" style="background:var(--green);"></div>
-          <div class="stat-lbl">Stunden diese Woche</div>
+          <div class="stat-lbl">
+            <span class="stat-lbl-full">Stunden diese Woche</span>
+            <span class="stat-lbl-short">Woche</span>
+          </div>
           <div class="stat-val" id="dWk">—</div>
           <div class="stat-sub">alle Mitarbeiter</div>
         </div>
@@ -2275,8 +2365,15 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
       <p class="dash-open-warn" id="dOpenMissing" style="display:none;"></p>
       <div class="card mb24 dash-open-section">
         <div class="card-header">
-          <div class="card-title">Nicht verrechnet</div>
+          <div class="card-title">
+            <span class="dash-open-title-desktop">Nicht verrechnet</span>
+            <span class="dash-open-title-phone">Offene Objekte</span>
+          </div>
           <span class="badge bo" id="dOpenCount">0</span>
+          <button type="button" class="dash-open-all" onclick="openRapporteOpenHours()" aria-label="Offene Stunden in Rapporten öffnen">
+            Alle
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
         </div>
         <div class="dash-open-table-wrap">
           <table class="dash-open-table">
@@ -2292,7 +2389,10 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
           </table>
         </div>
         <div class="dash-open-cards" id="dOpenCards" aria-live="polite"></div>
-        <button type="button" class="dash-open-cta" onclick="openRapporteOpenHours()">Offene Stunden in Rapporten öffnen</button>
+        <button type="button" class="dash-open-cta" onclick="openRapporteOpenHours()">
+          <span class="dash-open-cta-desktop">Offene Stunden in Rapporten öffnen</span>
+          <span class="dash-open-cta-phone">In Rapporten öffnen</span>
+        </button>
       </div>
       <div class="grid2 dash-lower">
         <div class="card dash-team-card">
@@ -2873,9 +2973,9 @@ hr.div { border:none;border-top:1px solid var(--border);margin:18px 0; }
     </div>
   </div>
 </div>
-<button type="button" class="mobile-fab" id="mobileFab" data-action="add-hours">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-  Stunden erfassen
+<button type="button" class="mobile-fab" id="mobileFab" data-action="add-hours" aria-label="Stunden erfassen" title="Stunden erfassen">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  <span class="fab-lbl">Stunden erfassen</span>
 </button>
 </div>
 
