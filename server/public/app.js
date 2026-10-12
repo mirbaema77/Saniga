@@ -458,29 +458,30 @@ function renderMobileBottomNav() {
         { active: mehrActive }
       );
   } else {
+    // Same stroke language as admin tabs (clean line icons, short labels).
     nav.innerHTML =
       mbnavBtn(
         'meine',
         'Zeiten',
-        '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        '<circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.5l3 1.8"/>',
         { active: cur === 'meine' }
       ) +
       mbnavBtn(
         'monat',
         'Monat',
-        '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
+        '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/>',
         { active: cur === 'monat' }
       ) +
       mbnavBtn(
         'absenzen',
         'Absenz',
-        '<path d="M20.2 7.8a3.5 3.5 0 0 0-5-5L5 13l-1.5 5.5L9 17l10.2-9.2z"/><path d="M14.5 4.5l5 5"/>',
+        '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15h6"/>',
         { active: cur === 'absenzen' }
       ) +
       mbnavBtn(
         'profil',
         'Profil',
-        '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        '<circle cx="12" cy="8" r="3.5"/><path d="M5.5 20v-1a4.5 4.5 0 0 1 4.5-4.5h4a4.5 4.5 0 0 1 4.5 4.5v1"/>',
         { active: cur === 'profil' }
       );
   }
