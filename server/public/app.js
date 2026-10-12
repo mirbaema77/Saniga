@@ -1695,15 +1695,103 @@ async function deleteAbsenceGroup(groupId) {
   }
 }
 
+function isStandalonePwa() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true
+  );
+}
+
+function isIosLike() {
+  const ua = navigator.userAgent || '';
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  // iPadOS desktop UA
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+}
+
+function invoiceFilenameFromHeader(cd, format) {
+  const m = /filename\*?=(?:UTF-8''|")?([^\";]+)/i.exec(cd || '');
+  if (m) {
+    try {
+      return decodeURIComponent(m[1].replace(/"/g, '').trim());
+    } catch {
+      return m[1].replace(/"/g, '').trim();
+    }
+  }
+  return format === 'docx' ? 'Rechnung.docx' : 'Rechnung.pdf';
+}
+
+/**
+ * PWA/phone-safe invoice download:
+ * 1) fetch blob with one-time key (consumes link once)
+ * 2) iOS/Android PWA + Web Share → Save to Files / share sheet
+ * 3) else trigger a normal file download
+ */
 async function openInvoiceDownload(invoiceId, format) {
   if (!IS_ADMIN || !invoiceId) return;
+  const fmt = format === 'docx' ? 'docx' : 'pdf';
   try {
+    toast(fmt === 'docx' ? 'Word wird vorbereitet…' : 'PDF wird vorbereitet…');
     const res = await api(`/invoices/${encodeURIComponent(invoiceId)}/download-link`, {
       method: 'POST',
-      body: JSON.stringify({ format }),
+      body: JSON.stringify({ format: fmt }),
     });
     if (!res?.url) throw new Error('Download-Link fehlt');
-    window.open(res.url, '_blank', 'noopener');
+
+    const fileRes = await fetch(res.url, { credentials: 'same-origin', cache: 'no-store' });
+    if (!fileRes.ok) {
+      let msg = `Download fehlgeschlagen (${fileRes.status})`;
+      try {
+        const body = await fileRes.json();
+        if (body?.error) msg = body.error;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(msg);
+    }
+
+    const blob = await fileRes.blob();
+    const mime =
+      fmt === 'docx'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'application/pdf';
+    const filename = invoiceFilenameFromHeader(fileRes.headers.get('Content-Disposition'), fmt);
+    const file = new File([blob], filename, { type: blob.type || mime });
+
+    const wantShare =
+      (isStandalonePwa() || isPhoneLayout() || isIosLike()) &&
+      typeof navigator.share === 'function' &&
+      (!navigator.canShare || navigator.canShare({ files: [file] }));
+
+    let shared = false;
+    if (wantShare) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: filename,
+          text: filename,
+        });
+        shared = true;
+        return;
+      } catch (shareErr) {
+        if (shareErr && shareErr.name === 'AbortError') return;
+        // Fall through to download if share fails (unsupported / denied).
+      }
+    }
+
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = filename;
+    a.rel = 'noopener';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 2500);
+    if (!shared && isStandalonePwa() && isIosLike()) {
+      toast('Gespeichert / bereit — ggf. «In Dateien sichern» im Teilen-Menü nutzen.');
+    }
   } catch (e) {
     toast(e.message || 'Download fehlgeschlagen');
   }
